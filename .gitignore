@@ -11,3 +11,6 @@ venv/
 .idea/
 .vscode/
 __pycache__/
+*.sf2
+*.sf3
+config.js

@@ -2,6 +2,11 @@ import os
 import sys
 import shutil
 
+# Prepend dynamic fluidsynth binary directory to system PATH
+fs_bin = r"D:\Document\NC-Project\sheetsage\AtoScore_Core\bin"
+if fs_bin not in os.environ.get("PATH", ""):
+    os.environ["PATH"] = fs_bin + os.path.pathsep + os.environ.get("PATH", "")
+
 # Configure local D-drive path for HuggingFace home
 project_dir = os.path.dirname(os.path.abspath(__file__))
 local_hf_home = os.path.join(project_dir, ".cache", "huggingface")
