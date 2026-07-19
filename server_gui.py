@@ -71,6 +71,7 @@ def main():
 
     if original_route:
         original_handler = original_route.endpoint
+        app.router.routes.remove(original_route)
         print("Successfully intercepted original /transcribe endpoint to add video support.")
 
         @app.post("/transcribe")
