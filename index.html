@@ -417,7 +417,7 @@
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 0.75rem;
-            height: 350px;
+            height: 200px;
             overflow-y: auto;
             padding: 1rem;
             font-family: var(--font-mono);
@@ -534,6 +534,145 @@
             cursor: help;
             margin-left: 0.25rem;
             color: var(--text-muted);
+        }
+
+        /* Piano Roll Visualizer */
+        .piano-roll-panel {
+            display: none;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .piano-roll-panel.active {
+            display: flex;
+        }
+
+        .piano-roll-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.2rem 1.5rem 0.8rem;
+        }
+
+        .piano-roll-header h2 {
+            margin-bottom: 0;
+        }
+
+        .piano-roll-controls {
+            display: flex;
+            gap: 0.35rem;
+            align-items: center;
+        }
+
+        .pr-btn {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            width: 32px;
+            height: 28px;
+            border-radius: 0.35rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pr-btn.wide {
+            width: auto;
+            padding: 0 0.6rem;
+            font-size: 0.75rem;
+            font-family: var(--font-main);
+            font-weight: 500;
+        }
+
+        .pr-btn:hover {
+            border-color: var(--primary);
+            color: var(--text-main);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .pr-btn.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .piano-roll-wrapper {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            cursor: grab;
+            overflow: hidden;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .piano-roll-wrapper:active {
+            cursor: grabbing;
+        }
+
+        .piano-roll-wrapper canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .track-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            padding: 0.7rem 1.5rem;
+            background: rgba(0, 0, 0, 0.15);
+            min-height: 36px;
+            align-items: center;
+        }
+
+        .track-legend-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-right: 0.25rem;
+        }
+
+        .track-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.78rem;
+            color: var(--text-main);
+            cursor: pointer;
+            padding: 0.15rem 0.5rem;
+            border-radius: 0.35rem;
+            transition: all 0.15s ease;
+            user-select: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .track-item:hover {
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .track-item.muted {
+            opacity: 0.3;
+        }
+
+        .track-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .track-note-count {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
         }
     </style>
 </head>
@@ -671,6 +810,25 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Piano Roll Visualizer -->
+            <div class="glass-panel piano-roll-panel" id="pianoRollPanel">
+                <div class="piano-roll-header">
+                    <h2>Piano Roll</h2>
+                    <div class="piano-roll-controls">
+                        <button class="pr-btn" id="btnPrZoomIn" title="Zoom In">+</button>
+                        <button class="pr-btn" id="btnPrZoomOut" title="Zoom Out">&minus;</button>
+                        <button class="pr-btn wide" id="btnPrFitAll" title="Fit All Notes">Fit</button>
+                        <button class="pr-btn wide active" id="btnPrFollow" title="Auto-follow latest notes">Following</button>
+                    </div>
+                </div>
+                <div class="piano-roll-wrapper" id="pianoRollWrapper">
+                    <canvas id="pianoRollCanvas"></canvas>
+                </div>
+                <div class="track-legend" id="trackLegend">
+                    <span class="track-legend-title">Detected Tracks</span>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -709,6 +867,17 @@
         const audioPlayback = document.getElementById('audioPlayback');
         const audioPlayer = document.getElementById('audioPlayer');
 
+        // Piano Roll elements
+        const pianoRollPanel = document.getElementById('pianoRollPanel');
+        const pianoRollCanvas = document.getElementById('pianoRollCanvas');
+        const pianoRollWrapper = document.getElementById('pianoRollWrapper');
+        const trackLegend = document.getElementById('trackLegend');
+        const btnPrZoomIn = document.getElementById('btnPrZoomIn');
+        const btnPrZoomOut = document.getElementById('btnPrZoomOut');
+        const btnPrFitAll = document.getElementById('btnPrFitAll');
+        const btnPrFollow = document.getElementById('btnPrFollow');
+        const prCtx = pianoRollCanvas.getContext('2d');
+
         let inputMode = 'local'; // 'local' or 'youtube'
         let selectedFile = null;
         let selectedInstruments = new Set();
@@ -718,6 +887,33 @@
         // Timing variables for ETA
         let startTime = null;
         let timeInterval = null;
+
+        // Piano Roll state
+        let pianoRollNotes = [];
+        let notesByIndex = {};
+        let instrumentColorMap = {};
+        let instrumentNoteCounts = {};
+        let trackVisibility = {};
+        let prColorIdx = 0;
+        let prViewStart = 0;
+        let prViewEnd = 15;
+        let prFollowing = true;
+        let prDragging = false;
+        let prDragStartX = 0;
+        let prDragViewStart = 0;
+        let prDetectedMinPitch = 127;
+        let prDetectedMaxPitch = 0;
+        let prRenderQueued = false;
+
+        const TRACK_COLORS = [
+            '#f6c344', '#e84393', '#00cec9', '#fd79a8', '#00b894',
+            '#74b9ff', '#6c5ce7', '#a29bfe', '#fab1a0', '#55efc4',
+            '#ff7675', '#0984e3', '#e17055', '#81ecec', '#dfe6e9', '#b2bec3'
+        ];
+        const PR_LEFT = 52;
+        const PR_TOP = 24;
+        const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+        const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
         // Check backend server status, GPU info and load instruments on load
         async function checkServer() {
@@ -888,6 +1084,25 @@
             progressPercent.textContent = '0%';
             transcribeStatus.textContent = 'Starting processing run...';
             notesVisualizer.innerHTML = '';
+
+            // Reset Piano Roll
+            pianoRollNotes = [];
+            notesByIndex = {};
+            instrumentColorMap = {};
+            instrumentNoteCounts = {};
+            trackVisibility = {};
+            prColorIdx = 0;
+            prViewStart = 0;
+            prViewEnd = 15;
+            prDetectedMinPitch = 127;
+            prDetectedMaxPitch = 0;
+            prFollowing = true;
+            btnPrFollow.classList.add('active');
+            btnPrFollow.textContent = 'Following';
+            pianoRollPanel.classList.add('active');
+            trackLegend.innerHTML = '<span class="track-legend-title">Detected Tracks</span>';
+            queuePianoRollRender();
+
             btnTranscribe.disabled = true;
             btnRemoveFile.disabled = true;
             ytUrlInput.disabled = true;
@@ -995,11 +1210,51 @@
                 }
             } 
             else if (event.type === 'start') {
-                const instrName = event.program !== undefined ? `Prog ${event.program}` : 'Default';
-                addLog(`NOTE ON: Pitch ${event.pitch}, Velocity ${event.velocity}, Instrument: ${instrName}`, "note-on");
+                const instrName = event.instrument || 'Unknown';
+                addLog(`NOTE ON: Pitch ${event.pitch}, Time ${event.start_time.toFixed(2)}s, Instrument: ${instrName}`, "note-on");
+
+                // Piano Roll: record note
+                const note = {
+                    pitch: event.pitch,
+                    startTime: event.start_time,
+                    endTime: null,
+                    instrument: instrName,
+                    index: event.index
+                };
+                pianoRollNotes.push(note);
+                notesByIndex[event.index] = note;
+
+                // Track instrument color
+                if (!instrumentColorMap[instrName]) {
+                    instrumentColorMap[instrName] = TRACK_COLORS[prColorIdx % TRACK_COLORS.length];
+                    prColorIdx++;
+                    trackVisibility[instrName] = true;
+                    instrumentNoteCounts[instrName] = 0;
+                }
+                instrumentNoteCounts[instrName]++;
+
+                // Update pitch range
+                if (event.pitch < prDetectedMinPitch) prDetectedMinPitch = event.pitch;
+                if (event.pitch > prDetectedMaxPitch) prDetectedMaxPitch = event.pitch;
+
+                // Auto-follow: scroll viewport to keep latest notes visible
+                if (prFollowing && event.start_time > prViewEnd - 2) {
+                    const viewSpan = prViewEnd - prViewStart;
+                    prViewEnd = event.start_time + viewSpan * 0.2;
+                    prViewStart = prViewEnd - viewSpan;
+                }
+
+                queuePianoRollRender();
             } 
             else if (event.type === 'end') {
-                addLog(`NOTE OFF: Event index ref ${event.start_event_index} (at ${event.end_time.toFixed(2)}s)`, "note-off");
+                addLog(`NOTE OFF: Index ${event.start_event_index} (at ${event.end_time.toFixed(2)}s)`, "note-off");
+
+                // Piano Roll: close note
+                const note = notesByIndex[event.start_event_index];
+                if (note) {
+                    note.endTime = event.end_time;
+                }
+                queuePianoRollRender();
             } 
             else if (event.type === 'status_update') {
                 // Custom status reports from YouTube download etc
@@ -1026,6 +1281,9 @@
                 generatedMidiBytes = bytes;
 
                 resultPanel.style.display = 'flex';
+
+                // Fit the piano roll to show all notes
+                fitPianoRoll();
             }
         }
 
@@ -1091,6 +1349,280 @@
                 btnAuralize.disabled = false;
             }
         });
+
+        // =================== PIANO ROLL RENDERER ===================
+
+        function queuePianoRollRender() {
+            if (!prRenderQueued) {
+                prRenderQueued = true;
+                requestAnimationFrame(() => {
+                    prRenderQueued = false;
+                    renderPianoRoll();
+                    updateTrackLegend();
+                });
+            }
+        }
+
+        function midiNoteName(pitch) {
+            const name = NOTE_NAMES[pitch % 12];
+            const octave = Math.floor(pitch / 12) - 1;
+            return `${name}${octave}`;
+        }
+
+        function isBlackKey(pitch) {
+            return BLACK_KEYS.has(pitch % 12);
+        }
+
+        function renderPianoRoll() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = pianoRollWrapper.getBoundingClientRect();
+            const w = rect.width;
+            const h = rect.height;
+            if (w === 0 || h === 0) return;
+
+            pianoRollCanvas.width = w * dpr;
+            pianoRollCanvas.height = h * dpr;
+            prCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const ctx = prCtx;
+
+            // Pitch range with padding
+            const pitchMin = Math.max(0, prDetectedMinPitch - 3);
+            const pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+            const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
+
+            const drawW = w - PR_LEFT;
+            const drawH = h - PR_TOP;
+            const pxPerPitch = drawH / pitchRange;
+            const timeSpan = prViewEnd - prViewStart;
+            const pxPerSec = drawW / timeSpan;
+
+            // Background
+            ctx.fillStyle = '#0d0e14';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw pitch rows
+            for (let p = pitchMin; p <= pitchMax; p++) {
+                const y = PR_TOP + (pitchMax - p) * pxPerPitch;
+                ctx.fillStyle = isBlackKey(p) ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
+                ctx.fillRect(PR_LEFT, y, drawW, pxPerPitch);
+
+                // Row grid line
+                ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(PR_LEFT, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+
+                // Highlight C notes
+                if (p % 12 === 0) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(PR_LEFT, y + pxPerPitch);
+                    ctx.lineTo(w, y + pxPerPitch);
+                    ctx.stroke();
+                }
+            }
+
+            // Pitch labels
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            const labelStep = pxPerPitch < 10 ? 12 : (pxPerPitch < 16 ? 6 : (pxPerPitch < 24 ? 3 : 1));
+            for (let p = pitchMin; p <= pitchMax; p++) {
+                if (p % labelStep !== 0) continue;
+                const y = PR_TOP + (pitchMax - p) * pxPerPitch + pxPerPitch / 2;
+                ctx.fillStyle = p % 12 === 0 ? '#9ca3af' : '#6b7280';
+                ctx.fillText(midiNoteName(p), PR_LEFT - 6, y);
+            }
+
+            // Time grid
+            const timeStep = getTimeGridStep(timeSpan, drawW);
+            const firstTick = Math.ceil(prViewStart / timeStep) * timeStep;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            for (let t = firstTick; t <= prViewEnd; t += timeStep) {
+                const x = PR_LEFT + (t - prViewStart) * pxPerSec;
+                ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(x, PR_TOP);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+                ctx.fillStyle = '#6b7280';
+                const mins = Math.floor(t / 60);
+                const secs = Math.floor(t % 60);
+                ctx.fillText(mins > 0 ? `${mins}:${secs.toString().padStart(2,'0')}` : `${secs}s`, x, 6);
+            }
+
+            // Borders
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(PR_LEFT, 0); ctx.lineTo(PR_LEFT, h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, PR_TOP); ctx.lineTo(w, PR_TOP); ctx.stroke();
+
+            // Draw notes
+            const cornerR = Math.min(3, pxPerPitch / 3);
+            for (const note of pianoRollNotes) {
+                if (!trackVisibility[note.instrument]) continue;
+                if (note.pitch < pitchMin || note.pitch > pitchMax) continue;
+                const noteEnd = note.endTime !== null ? note.endTime : (prViewEnd + 0.5);
+                if (noteEnd < prViewStart || note.startTime > prViewEnd) continue;
+
+                const x = PR_LEFT + (note.startTime - prViewStart) * pxPerSec;
+                const xEnd = PR_LEFT + (noteEnd - prViewStart) * pxPerSec;
+                const noteW = Math.max(xEnd - x, 2);
+                const y = PR_TOP + (pitchMax - note.pitch) * pxPerPitch + 1;
+                const noteH = pxPerPitch - 2;
+                const color = instrumentColorMap[note.instrument] || '#6366f1';
+
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.85;
+                prRoundRect(ctx, Math.max(x, PR_LEFT), y, noteW, Math.max(noteH, 2), cornerR);
+                ctx.fill();
+
+                // Subtle top highlight
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#ffffff';
+                prRoundRect(ctx, Math.max(x, PR_LEFT), y, noteW, Math.max(noteH / 3, 1), cornerR);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Open note pulsing edge
+                if (note.endTime === null) {
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(Date.now() / 200);
+                    ctx.fillRect(xEnd - 3, y, 3, Math.max(noteH, 2));
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        function prRoundRect(ctx, x, y, w, h, r) {
+            r = Math.min(r, w / 2, h / 2);
+            if (r < 0.5) { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.closePath(); return; }
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + r, r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx.lineTo(x + r, y + h);
+            ctx.arcTo(x, y + h, x, y + h - r, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + r, y, r);
+            ctx.closePath();
+        }
+
+        function getTimeGridStep(timeSpan, width) {
+            const targetPx = 80;
+            const rawStep = timeSpan * targetPx / width;
+            const steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60];
+            for (const s of steps) { if (s >= rawStep) return s; }
+            return 60;
+        }
+
+        function updateTrackLegend() {
+            trackLegend.innerHTML = '<span class="track-legend-title">Detected Tracks</span>';
+            for (const [inst, color] of Object.entries(instrumentColorMap)) {
+                const count = instrumentNoteCounts[inst] || 0;
+                const item = document.createElement('div');
+                item.className = `track-item${trackVisibility[inst] ? '' : ' muted'}`;
+                item.innerHTML = `<span class="track-color-dot" style="background:${color}"></span><span>${inst}</span><span class="track-note-count">${count}</span>`;
+                item.addEventListener('click', () => {
+                    trackVisibility[inst] = !trackVisibility[inst];
+                    item.classList.toggle('muted');
+                    queuePianoRollRender();
+                });
+                trackLegend.appendChild(item);
+            }
+        }
+
+        function fitPianoRoll() {
+            if (pianoRollNotes.length === 0) return;
+            let maxTime = 0;
+            for (const n of pianoRollNotes) {
+                const t = n.endTime || n.startTime;
+                if (t > maxTime) maxTime = t;
+            }
+            prViewStart = 0;
+            prViewEnd = Math.max(maxTime + 1, 5);
+            queuePianoRollRender();
+        }
+
+        // Piano Roll interaction: drag to pan
+        pianoRollWrapper.addEventListener('mousedown', (e) => {
+            prDragging = true;
+            prDragStartX = e.clientX;
+            prDragViewStart = prViewStart;
+            prFollowing = false;
+            btnPrFollow.classList.remove('active');
+            btnPrFollow.textContent = 'Follow';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!prDragging) return;
+            const rect = pianoRollWrapper.getBoundingClientRect();
+            const drawW = rect.width - PR_LEFT;
+            const timeSpan = prViewEnd - prViewStart;
+            const dx = e.clientX - prDragStartX;
+            const timeDelta = -(dx / drawW) * timeSpan;
+            prViewStart = Math.max(0, prDragViewStart + timeDelta);
+            prViewEnd = prViewStart + timeSpan;
+            queuePianoRollRender();
+        });
+
+        window.addEventListener('mouseup', () => { prDragging = false; });
+
+        // Wheel to zoom
+        pianoRollWrapper.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = pianoRollWrapper.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const drawW = rect.width - PR_LEFT;
+            const timeSpan = prViewEnd - prViewStart;
+            const mouseTime = prViewStart + ((mouseX - PR_LEFT) / drawW) * timeSpan;
+            const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
+            const newSpan = Math.max(1, Math.min(600, timeSpan * zoomFactor));
+            const ratio = (mouseX - PR_LEFT) / drawW;
+            prViewStart = Math.max(0, mouseTime - newSpan * ratio);
+            prViewEnd = prViewStart + newSpan;
+            prFollowing = false;
+            btnPrFollow.classList.remove('active');
+            btnPrFollow.textContent = 'Follow';
+            queuePianoRollRender();
+        }, { passive: false });
+
+        // Toolbar buttons
+        btnPrZoomIn.addEventListener('click', () => {
+            const center = (prViewStart + prViewEnd) / 2;
+            const span = (prViewEnd - prViewStart) * 0.7;
+            prViewStart = Math.max(0, center - span / 2);
+            prViewEnd = prViewStart + span;
+            queuePianoRollRender();
+        });
+
+        btnPrZoomOut.addEventListener('click', () => {
+            const center = (prViewStart + prViewEnd) / 2;
+            const span = Math.min(600, (prViewEnd - prViewStart) * 1.4);
+            prViewStart = Math.max(0, center - span / 2);
+            prViewEnd = prViewStart + span;
+            queuePianoRollRender();
+        });
+
+        btnPrFitAll.addEventListener('click', () => { fitPianoRoll(); });
+
+        btnPrFollow.addEventListener('click', () => {
+            prFollowing = !prFollowing;
+            btnPrFollow.classList.toggle('active');
+            btnPrFollow.textContent = prFollowing ? 'Following' : 'Follow';
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => queuePianoRollRender());
+
     </script>
 </body>
 </html>
