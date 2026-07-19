@@ -1,0 +1,13 @@
+venv/
+*.whl
+*.log
+*.mid
+*.mp3
+*.wav
+*.mp4
+*.mkv
+*.mov
+*.avi
+.idea/
+.vscode/
+__pycache__/
