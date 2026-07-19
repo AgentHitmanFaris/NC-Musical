@@ -1123,6 +1123,7 @@
                     addLog("Uploading local file and initializing model...", "system");
                     const formData = new FormData();
                     formData.append('file', selectedFile);
+                    formData.append('model_size', modelSizeSelect.value);
                     selectedInstruments.forEach(inst => {
                         formData.append('instruments', inst);
                     });
@@ -1137,6 +1138,7 @@
                     
                     const formData = new FormData();
                     formData.append('url', ytUrl);
+                    formData.append('model_size', modelSizeSelect.value);
                     selectedInstruments.forEach(inst => {
                         formData.append('instruments', inst);
                     });
