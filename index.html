@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <script src="config.js" onerror="console.log('Running in server mode, config.js not required')"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MuScriptor GUI — AI Music Transcription</title>
     <!-- Google Fonts -->
@@ -521,6 +522,51 @@
             color: var(--text-muted);
         }
 
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #07080c;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .loading-overlay.fade-out {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-main);
+        }
+
+        .loading-subtext {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         /* Piano Roll Visualizer */
         .piano-roll-panel {
             display: flex;
@@ -620,7 +666,19 @@
             font-family: var(--font-mono);
         }
     </style>
-</head>    <aside class="sidebar">
+</head>
+<body>
+    <!-- Full-screen Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="logo" style="margin-bottom: 1rem;">
+            MuScriptor <span class="badge">AMT</span>
+        </div>
+        <div class="loading-text" id="loadingText">Connecting to backend server...</div>
+        <div class="loading-subtext">Initializing AI models and components. This may take up to a minute on first launch.</div>
+    </div>
+
+    <aside class="sidebar">
         <div class="sidebar-header">
             <div class="logo">
                 MuScriptor <span class="badge">AMT</span>
@@ -768,6 +826,14 @@
     </main>
 
     <script>
+        // Resolve backend port: if BACKEND_PORT is injected by pywebview config.js, use it.
+        // Otherwise, fallback to the current window location port or 8222.
+        const API_PORT = typeof BACKEND_PORT !== 'undefined' ? BACKEND_PORT : window.location.port || 8222;
+        const API_BASE = `http://127.0.0.1:${API_PORT}`;
+
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingText = document.getElementById('loadingText');
+
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
         const gpuInfo = document.getElementById('gpuInfo');
@@ -894,7 +960,7 @@
         // Check backend server status, GPU info and load instruments on load
         async function checkServer() {
             try {
-                const response = await fetch('/health');
+                const response = await fetch(`${API_BASE}/health`);
                 if (response.ok) {
                     const data = await response.json();
                     statusDot.className = 'status-dot online';
@@ -919,7 +985,7 @@
 
         async function loadInstruments() {
             try {
-                const response = await fetch('/instruments');
+                const response = await fetch(`${API_BASE}/instruments`);
                 if (response.ok) {
                     const data = await response.json();
                     instrumentsList.innerHTML = '';
@@ -945,7 +1011,43 @@
             }
         }
 
-        checkServer();
+        // Poll backend health check until it is online
+        async function initializeDesktopApp() {
+            let attempts = 0;
+            const maxAttempts = 120; // 60 seconds
+            
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(`${API_BASE}/health`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Hide loading overlay with fade out transition
+                        loadingOverlay.classList.add('fade-out');
+                        
+                        statusDot.className = 'status-dot online';
+                        statusText.textContent = 'Server Online';
+                        if (data.gpu) {
+                            gpuInfo.textContent = `GPU: ${data.gpu}`;
+                        } else {
+                            gpuInfo.textContent = 'GPU: None (CPU)';
+                        }
+                        
+                        loadInstruments();
+                        return;
+                    }
+                } catch (e) {
+                    // Not ready yet
+                }
+                attempts++;
+                loadingText.textContent = `Loading AI models & backend server... (${Math.round((attempts / maxAttempts) * 100)}%)`;
+                await new Promise(r => setTimeout(r, 500));
+            }
+            
+            loadingText.textContent = "Failed to connect to backend server. Please try restarting.";
+            loadingText.style.color = "#ef4444";
+        }
+
+        initializeDesktopApp();
         // Poll server status every 10 seconds
         setInterval(checkServer, 10000);
 
@@ -1104,7 +1206,7 @@
                         formData.append('instruments', inst);
                     });
 
-                    response = await fetch('/transcribe', {
+                    response = await fetch(`${API_BASE}/transcribe`, {
                         method: 'POST',
                         body: formData
                     });
@@ -1119,7 +1221,7 @@
                         formData.append('instruments', inst);
                     });
 
-                    response = await fetch('/transcribe_youtube', {
+                    response = await fetch(`${API_BASE}/transcribe_youtube`, {
                         method: 'POST',
                         body: formData
                     });
@@ -1303,7 +1405,7 @@
                 formData.append('midi', midiBlob, 'transcription.mid');
                 formData.append('mode', 'synth'); // synthesis only
 
-                const response = await fetch('/auralize', {
+                const response = await fetch(`${API_BASE}/auralize`, {
                     method: 'POST',
                     body: formData
                 });
