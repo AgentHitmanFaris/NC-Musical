@@ -756,10 +756,15 @@
                 </div>
             </div>
 
-            <button id="btnTranscribe" class="btn-action" disabled style="padding: 0.65rem 1rem; font-size: 0.9rem; border-radius: 0.35rem;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                Start Transcription
-            </button>
+            <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <button id="btnTranscribe" class="btn-action" disabled style="padding: 0.65rem 1rem; font-size: 0.9rem; border-radius: 0.35rem; flex: 1;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Start Transcription
+                </button>
+                <button id="btnCancelTranscribe" class="btn-action" style="padding: 0.65rem 1rem; font-size: 0.9rem; border-radius: 0.35rem; display: none; background: #ef4444; border-color: #ef4444; color: white; width: auto; flex: 0 0 auto;">
+                    Cancel
+                </button>
+            </div>
         </div>
 
         <!-- Real-time Progress & Visualization -->
@@ -810,6 +815,7 @@
             <div class="piano-roll-header">
                 <h2>Piano Roll</h2>
                 <div class="piano-roll-controls">
+                    <button class="pr-btn wide" id="btnPrPlay" title="Play/Stop MIDI notes" style="background: #10b981; border-color: #10b981; color: white;">Play</button>
                     <button class="pr-btn" id="btnPrZoomIn" title="Zoom In">+</button>
                     <button class="pr-btn" id="btnPrZoomOut" title="Zoom Out">&minus;</button>
                     <button class="pr-btn wide" id="btnPrFitAll" title="Fit All Notes">Fit</button>
@@ -840,6 +846,7 @@
         const modelSizeSelect = document.getElementById('modelSize');
         const instrumentsList = document.getElementById('instrumentsList');
         const btnTranscribe = document.getElementById('btnTranscribe');
+        const btnCancelTranscribe = document.getElementById('btnCancelTranscribe');
         
         const tabLocal = document.getElementById('tabLocal');
         const tabYoutube = document.getElementById('tabYoutube');
@@ -877,6 +884,7 @@
         const btnPrZoomOut = document.getElementById('btnPrZoomOut');
         const btnPrFitAll = document.getElementById('btnPrFitAll');
         const btnPrFollow = document.getElementById('btnPrFollow');
+        const btnPrPlay = document.getElementById('btnPrPlay');
         const prCtx = pianoRollCanvas.getContext('2d');
 
         let inputMode = 'local'; // 'local' or 'youtube'
@@ -908,6 +916,14 @@
         let activeSynthPitch = null;
         let audioCtx = null;
 
+        let transcribeAbortController = null;
+        
+        // Playback state variables
+        let isPlaying = false;
+        let playbackTime = 0;
+        let playbackLastTick = 0;
+        let playbackInterval = null;
+
         const TRACK_COLORS = [
             '#f6c344', '#e84393', '#00cec9', '#fd79a8', '#00b894',
             '#74b9ff', '#6c5ce7', '#a29bfe', '#fab1a0', '#55efc4',
@@ -919,7 +935,7 @@
         const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
         // Play Synth Tone via AudioContext
-        function playSynthNote(pitch) {
+        function playSynthNote(pitch, duration = 0.5) {
             try {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -937,21 +953,21 @@
                 osc.frequency.value = freq;
                 
                 gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
                 
                 osc.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
                 
                 osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
+                osc.stop(audioCtx.currentTime + duration);
 
                 // Highlight key
                 activeSynthPitch = pitch;
                 queuePianoRollRender();
                 setTimeout(() => {
-                    activeSynthPitch = null;
+                    if (activeSynthPitch === pitch) activeSynthPitch = null;
                     queuePianoRollRender();
-                }, 150);
+                }, Math.min(150, duration * 1000));
             } catch (e) {
                 console.error("Synth playback failed:", e);
             }
@@ -1182,6 +1198,7 @@
             queuePianoRollRender();
 
             btnTranscribe.disabled = true;
+            btnCancelTranscribe.style.display = 'block';
             btnRemoveFile.disabled = true;
             ytUrlInput.disabled = true;
             generatedMidiBase64 = null;
@@ -1194,6 +1211,8 @@
             etaTimeLabel.textContent = "ETA: Calculating...";
             clearInterval(timeInterval);
             timeInterval = setInterval(updateElapsedStats, 1000);
+
+            transcribeAbortController = new AbortController();
 
             let response;
             try {
@@ -1208,7 +1227,8 @@
 
                     response = await fetch(`${API_BASE}/transcribe`, {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        signal: transcribeAbortController.signal
                     });
                 } else {
                     const ytUrl = ytUrlInput.value.trim();
@@ -1223,7 +1243,8 @@
 
                     response = await fetch(`${API_BASE}/transcribe_youtube`, {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        signal: transcribeAbortController.signal
                     });
                 }
 
@@ -1260,15 +1281,39 @@
                     }
                 }
             } catch (e) {
-                console.error("Transcription failed:", e);
-                transcribeStatus.textContent = 'Failed';
-                addLog(`Error: ${e.message}`, "note-on");
-                clearInterval(timeInterval);
+                if (e.name === 'AbortError') {
+                    // Suppress abort errors since we handle them in the cancel handler
+                    console.log("Transcription fetch was aborted.");
+                } else {
+                    console.error("Transcription failed:", e);
+                    transcribeStatus.textContent = 'Failed';
+                    addLog(`Error: ${e.message}`, "note-on");
+                    clearInterval(timeInterval);
+                }
             } finally {
+                transcribeAbortController = null;
+                btnTranscribe.disabled = false;
+                btnCancelTranscribe.style.display = 'none';
+                btnRemoveFile.disabled = false;
+                ytUrlInput.disabled = false;
+                checkInputs();
+            }
+        });
+
+        // Cancel transcription trigger
+        btnCancelTranscribe.addEventListener('click', () => {
+            if (transcribeAbortController) {
+                transcribeAbortController.abort();
+                transcribeAbortController = null;
+                addLog("Transcription aborted by user.", "system note-off");
+                transcribeStatus.textContent = 'Cancelled';
+                
+                btnCancelTranscribe.style.display = 'none';
                 btnTranscribe.disabled = false;
                 btnRemoveFile.disabled = false;
                 ytUrlInput.disabled = false;
                 checkInputs();
+                clearInterval(timeInterval);
             }
         });
 
@@ -1639,6 +1684,28 @@
             // Draw top-left empty corner junction block
             ctx.fillStyle = '#0a0b10';
             ctx.fillRect(0, 0, PR_LEFT, PR_TOP);
+
+            // Draw Playhead Line if playing
+            if (isPlaying && playbackTime >= prViewStart && playbackTime <= prViewEnd) {
+                const playheadX = PR_LEFT + (playbackTime - prViewStart) * pxPerSec;
+                
+                // Draw vertical line across grid
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(playheadX, PR_TOP);
+                ctx.lineTo(playheadX, h);
+                ctx.stroke();
+
+                // Draw playhead triangle at the top timeline ruler
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(playheadX - 6, 0);
+                ctx.lineTo(playheadX + 6, 0);
+                ctx.lineTo(playheadX, 10);
+                ctx.closePath();
+                ctx.fill();
+            }
         }
 
         function prRoundRect(ctx, x, y, w, h, r) {
@@ -1785,8 +1852,94 @@
             btnPrFollow.textContent = prFollowing ? 'Following' : 'Follow';
         });
 
+        // Playback Logic
+        function startPlayback() {
+            if (pianoRollNotes.length === 0) return;
+            isPlaying = true;
+            btnPrPlay.textContent = 'Stop';
+            btnPrPlay.style.background = '#ef4444';
+            btnPrPlay.style.borderColor = '#ef4444';
+            
+            playbackTime = prViewStart; // Play from current view start
+            playbackLastTick = performance.now();
+            
+            // Sort notes by start time
+            const sortedNotes = [...pianoRollNotes].sort((a, b) => a.startTime - b.startTime);
+            let noteIndex = 0;
+            
+            // Fast-forward noteIndex past playbackTime
+            while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime < playbackTime) {
+                noteIndex++;
+            }
+            
+            playbackInterval = requestAnimationFrame(function tick(now) {
+                if (!isPlaying) return;
+                
+                const delta = (now - playbackLastTick) / 1000;
+                playbackLastTick = now;
+                
+                const prevTime = playbackTime;
+                playbackTime += delta;
+                
+                // Play notes falling in this frame
+                while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime <= playbackTime) {
+                    const note = sortedNotes[noteIndex];
+                    if (note.startTime >= prevTime && trackVisibility[note.instrument]) {
+                        const duration = note.endTime ? (note.endTime - note.startTime) : 0.5;
+                        playSynthNote(note.pitch, Math.max(0.1, duration));
+                    }
+                    noteIndex++;
+                }
+                
+                // If following, auto-pan the view
+                if (prFollowing && playbackTime > prViewEnd) {
+                    const span = prViewEnd - prViewStart;
+                    prViewStart = playbackTime;
+                    prViewEnd = prViewStart + span;
+                }
+                
+                queuePianoRollRender();
+                
+                // Stop at the end of the song
+                let maxTime = 0;
+                for (const n of pianoRollNotes) {
+                    const t = n.endTime || n.startTime;
+                    if (t > maxTime) maxTime = t;
+                }
+                if (playbackTime > maxTime + 0.5) {
+                    stopPlayback();
+                    return;
+                }
+                
+                playbackInterval = requestAnimationFrame(tick);
+            });
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            if (playbackInterval) {
+                cancelAnimationFrame(playbackInterval);
+                playbackInterval = null;
+            }
+            btnPrPlay.textContent = 'Play';
+            btnPrPlay.style.background = '#10b981';
+            btnPrPlay.style.borderColor = '#10b981';
+            queuePianoRollRender();
+        }
+
+        btnPrPlay.addEventListener('click', () => {
+            if (isPlaying) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        });
+
         // Resize handler
-        window.addEventListener('resize', () => queuePianoRollRender());
+        window.addEventListener('resize', () => {
+            if (isPlaying) stopPlayback();
+            queuePianoRollRender();
+        });
 
         // Queue initial render on load to draw empty keyboard and grid
         queuePianoRollRender();
