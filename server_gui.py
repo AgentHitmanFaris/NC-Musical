@@ -214,6 +214,14 @@ def main():
     async def health_check():
         return {"status": "ok", "gpu": gpu_name}
 
+    from fastapi.responses import FileResponse
+    @app.get("/audio")
+    async def get_latest_audio():
+        latest_audio_path = os.path.join(current_dir, ".temp", "latest_audio.wav")
+        if os.path.exists(latest_audio_path):
+            return FileResponse(latest_audio_path, media_type="audio/wav")
+        raise HTTPException(status_code=404, detail="No audio file transcribed yet")
+
     # Locate and wrap the original transcribe handler to intercept video files
     original_route = None
     for route in app.router.routes:
@@ -247,66 +255,51 @@ def main():
 
             release_once = make_release_once(transcribe_lock)
 
-            # Get filename
             filename = file.filename or ""
-            ext = os.path.splitext(filename)[1].lower()
-            video_exts = {".mp4", ".mkv", ".mov", ".avi", ".flv", ".webm", ".m4v", ".3gp"}
+            ext = os.path.splitext(filename)[1].lower() or ".wav"
 
             # Async generator function to do file processing and streaming
             def gen():
-                temp_video_path = None
-                temp_wav_path = None
+                temp_input_path = None
                 try:
-                    if ext in video_exts:
-                        # Extract audio from video
-                        yield f"data: {json.dumps({'type': 'status_update', 'message': f'Video file detected. Extracting audio track...'})}\n\n"
-                        temp_dir = os.path.join(current_dir, ".temp")
-                        os.makedirs(temp_dir, exist_ok=True)
-                        
-                        with tempfile.NamedTemporaryFile(suffix=ext, dir=temp_dir, delete=False) as temp_video:
-                            temp_video.write(file.file.read())
-                            temp_video_path = temp_video.name
+                    temp_dir = os.path.join(current_dir, ".temp")
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                    yield f"data: {json.dumps({'type': 'status_update', 'message': 'Processing uploaded file...'})}\n\n"
+                    
+                    # Save the uploaded file to a temp file
+                    with tempfile.NamedTemporaryFile(suffix=ext, dir=temp_dir, delete=False) as temp_in:
+                        temp_in.write(file.file.read())
+                        temp_input_path = temp_in.name
 
-                        temp_wav_path = temp_video_path + ".wav"
-                        cmd = [
-                            ffmpeg_executable, "-y", "-i", temp_video_path,
-                            "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
-                            temp_wav_path
-                        ]
-                        print(f"Running FFmpeg: {' '.join(cmd)}")
-                        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        if result.returncode != 0:
-                            yield f"data: {json.dumps({'type': 'status_update', 'message': 'FFmpeg conversion failed!'})}\n\n"
-                            return
+                    latest_audio_path = os.path.join(temp_dir, "latest_audio.wav")
+                    
+                    # Convert to standard 16kHz mono WAV using FFmpeg
+                    cmd = [
+                        ffmpeg_executable, "-y", "-i", temp_input_path,
+                        "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                        latest_audio_path
+                    ]
+                    print(f"Running FFmpeg: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if result.returncode != 0:
+                        yield f"data: {json.dumps({'type': 'status_update', 'message': 'FFmpeg conversion to standardized WAV failed!'})}\n\n"
+                        return
 
-                        from muscriptor.utils.audio import _read_wav_file
-                        with open(temp_wav_path, "rb") as f:
-                            wav_data = f.read()
-                        wav, sr = _read_wav_file(BytesIO(wav_data))
-                    else:
-                        # Direct audio
-                        data = file.file.read()
-                        from muscriptor.utils.audio import _read_non_wav_file, _read_wav_file
-                        try:
-                            wav, sr = _read_wav_file(BytesIO(data))
-                        except (wave.Error, EOFError):
-                            try:
-                                wav, sr = _read_non_wav_file(BytesIO(data))
-                            except Exception as e:
-                                yield f"data: {json.dumps({'type': 'status_update', 'message': f'Decoding failed: {str(e)}'})}\n\n"
-                                return
+                    from muscriptor.utils.audio import _read_wav_file
+                    with open(latest_audio_path, "rb") as f:
+                        wav_data = f.read()
+                    wav, sr = _read_wav_file(BytesIO(wav_data))
 
                     # Stream transcription
                     for chunk in run_transcription(wav, sr, instruments, model_size, cancel):
                         yield chunk
 
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'status_update', 'message': f'Error standardizing audio: {str(e)}'})}\n\n"
                 finally:
-                    # Cleanup
-                    if temp_video_path and os.path.exists(temp_video_path):
-                        try: os.remove(temp_video_path)
-                        except: pass
-                    if temp_wav_path and os.path.exists(temp_wav_path):
-                        try: os.remove(temp_wav_path)
+                    if temp_input_path and os.path.exists(temp_input_path):
+                        try: os.remove(temp_input_path)
                         except: pass
                     release_once()
 
@@ -380,11 +373,11 @@ def main():
                 # Step 2: Convert to WAV using FFmpeg
                 yield f"data: {json.dumps({'type': 'status_update', 'message': 'Converting audio track to WAV...'})}\n\n"
                 
-                temp_wav_path = temp_audio_path + ".wav"
+                latest_audio_path = os.path.join(temp_dir, "latest_audio.wav")
                 cmd = [
                     ffmpeg_executable, "-y", "-i", temp_audio_path,
                     "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
-                    temp_wav_path
+                    latest_audio_path
                 ]
                 print(f"Running FFmpeg: {' '.join(cmd)}")
                 result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -394,7 +387,7 @@ def main():
                 
                 # Step 3: Perform Transcription
                 from muscriptor.utils.audio import _read_wav_file
-                with open(temp_wav_path, "rb") as f:
+                with open(latest_audio_path, "rb") as f:
                     wav_data = f.read()
                 wav, sr = _read_wav_file(BytesIO(wav_data))
                 
@@ -408,9 +401,6 @@ def main():
                 # Cleanup files
                 if temp_audio_path and os.path.exists(temp_audio_path):
                     try: os.remove(temp_audio_path)
-                    except: pass
-                if temp_wav_path and os.path.exists(temp_wav_path):
-                    try: os.remove(temp_wav_path)
                     except: pass
 
         return StreamingResponse(
