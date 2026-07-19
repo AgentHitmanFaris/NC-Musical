@@ -33,34 +33,25 @@ def run_server(port):
 if __name__ == "__main__":
     port = find_free_port()
     
+    # Write dynamic port configuration to config.js so local file system can find backend
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.js")
+    with open(config_path, "w") as f:
+        f.write(f"const BACKEND_PORT = {port};\n")
+        
     # Start FastAPI server in background daemon thread
     server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
     server_thread.start()
     
-    # Poll the health check endpoint until uvicorn binds and responds
-    health_url = f"http://127.0.0.1:{port}/health"
-    print(f"Waiting for backend server to start at {health_url}...")
+    # Get absolute local path to index.html
+    html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html"))
+    html_url = f"file:///{html_path.replace(os.sep, '/')}"
     
-    server_ready = False
-    for i in range(120):  # Wait up to 60 seconds (120 * 0.5s)
-        try:
-            with urllib.request.urlopen(health_url, timeout=1.0) as response:
-                if response.status == 200:
-                    server_ready = True
-                    break
-        except Exception:
-            time.sleep(0.5)
-            
-    if not server_ready:
-        print("Backend server failed to start or load model weights in time.")
-        sys.exit(1)
-        
-    print(f"Launching GUI window at: http://127.0.0.1:{port}/index.html")
+    print(f"Launching GUI window instantly at: {html_url}")
     
-    # Start native WebView2 window wrapper
+    # Start native WebView2 window wrapper immediately
     webview.create_window(
         "MuScriptor AMT Desktop",
-        f"http://127.0.0.1:{port}/index.html",
+        html_url,
         width=1320,
         height=850,
         background_color='#07080c'
