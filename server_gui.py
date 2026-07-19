@@ -209,7 +209,17 @@ def main():
     # Create app
     app = create_app(model, web_dir=current_dir)
 
-    # Intercept health check to include GPU name
+    # Locate and wrap the original health handler to return GPU name
+    original_health_route = None
+    for route in app.router.routes:
+        if route.path == "/health" and hasattr(route, "methods") and "GET" in route.methods:
+            original_health_route = route
+            break
+
+    if original_health_route:
+        app.router.routes.remove(original_health_route)
+        print("Successfully intercepted original /health endpoint to include GPU name.")
+
     @app.get("/health")
     async def health_check():
         return {"status": "ok", "gpu": gpu_name}
