@@ -665,6 +665,122 @@
             color: var(--text-muted);
             font-family: var(--font-mono);
         }
+
+        /* Piano Roll Sub-Toolbar */
+        .piano-roll-toolbar {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem 1.5rem;
+            background: rgba(13, 14, 20, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .toolbar-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-right: 0.25rem;
+        }
+
+        .divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--text-main);
+        }
+
+        .slider-container input[type="range"] {
+            width: 70px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary);
+            transition: background 0.15s ease;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--secondary);
+        }
+
+        .slider-container span {
+            min-width: 32px;
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        select#selectActiveInstrument {
+            background: #141620;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            border-radius: 0.25rem;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.75rem;
+            outline: none;
+            max-width: 150px;
+        }
+
+        /* Enhanced Legend Styling */
+        .track-item {
+            position: relative;
+            padding-right: 0.4rem;
+        }
+        .track-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-left: 0.5rem;
+        }
+        .track-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 0 0.2rem;
+            border-radius: 3px;
+            transition: all 0.15s ease;
+        }
+        .track-action-btn:hover {
+            color: white;
+            background: rgba(255,255,255,0.1);
+        }
+        .track-action-btn.active-solo {
+            color: #f59e0b; /* Yellow gold */
+            background: rgba(245, 158, 11, 0.15);
+        }
+        .track-action-btn.active-mute {
+            color: #ef4444; /* Red */
+            background: rgba(239, 68, 68, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -822,6 +938,45 @@
                     <button class="pr-btn wide active" id="btnPrFollow" title="Auto-follow latest notes">Following</button>
                 </div>
             </div>
+            <div class="piano-roll-toolbar">
+                <div class="toolbar-group">
+                    <span class="toolbar-label">Tools:</span>
+                    <button class="pr-btn active" id="btnToolSelect" title="Select & Move Notes (Ctrl+1)">Select</button>
+                    <button class="pr-btn" id="btnToolDraw" title="Draw/Add Notes (Ctrl+2)">Draw</button>
+                    <button class="pr-btn" id="btnToolErase" title="Erase Notes (Ctrl+3)">Erase</button>
+                </div>
+                <div class="divider"></div>
+                <div class="toolbar-group">
+                    <span class="toolbar-label">History:</span>
+                    <button class="pr-btn" id="btnUndo" disabled title="Undo (Ctrl+Z)">Undo</button>
+                    <button class="pr-btn" id="btnRedo" disabled title="Redo (Ctrl+Y)">Redo</button>
+                </div>
+                <div class="divider"></div>
+                <div class="toolbar-group">
+                    <span class="toolbar-label">Active Part:</span>
+                    <select id="selectActiveInstrument" title="Assign drawn notes to this instrument">
+                        <option value="Piano">Piano</option>
+                    </select>
+                </div>
+                <div class="divider"></div>
+                <div class="toolbar-group">
+                    <div class="slider-container">
+                        <span class="toolbar-label">Original Audio:</span>
+                        <input type="range" id="sliderVolAudio" min="0" max="1" step="0.05" value="0.7">
+                        <span id="labelVolAudio">70%</span>
+                    </div>
+                    <div class="slider-container" style="margin-left: 0.5rem;">
+                        <span class="toolbar-label">MIDI Synth:</span>
+                        <input type="range" id="sliderVolSynth" min="0" max="1" step="0.05" value="0.5">
+                        <span id="labelVolSynth">50%</span>
+                    </div>
+                    <div class="slider-container" style="margin-left: 0.5rem;">
+                        <span class="toolbar-label">Speed:</span>
+                        <input type="range" id="sliderSpeed" min="0.25" max="2" step="0.25" value="1">
+                        <span id="labelSpeed">1.00x</span>
+                    </div>
+                </div>
+            </div>
             <div class="piano-roll-wrapper" id="pianoRollWrapper">
                 <canvas id="pianoRollCanvas"></canvas>
             </div>
@@ -915,6 +1070,297 @@
         let prRenderQueued = false;
         let activeSynthPitch = null;
         let audioCtx = null;
+
+        // Editor UI elements
+        const btnToolSelect = document.getElementById('btnToolSelect');
+        const btnToolDraw = document.getElementById('btnToolDraw');
+        const btnToolErase = document.getElementById('btnToolErase');
+        const btnUndo = document.getElementById('btnUndo');
+        const btnRedo = document.getElementById('btnRedo');
+        const selectActiveInstrument = document.getElementById('selectActiveInstrument');
+        
+        const sliderVolAudio = document.getElementById('sliderVolAudio');
+        const labelVolAudio = document.getElementById('labelVolAudio');
+        const sliderVolSynth = document.getElementById('sliderVolSynth');
+        const labelVolSynth = document.getElementById('labelVolSynth');
+        const sliderSpeed = document.getElementById('sliderSpeed');
+        const labelSpeed = document.getElementById('labelSpeed');
+
+        // Original audio player element
+        const originalAudioPlayer = new Audio();
+
+        // Audio & Playback Speed state
+        let volAudio = 0.7;
+        let volSynth = 0.5;
+        let playbackSpeedRate = 1.0;
+        let originalAudioLoaded = false;
+
+        // Track solo & mute states
+        let trackSolo = {};
+        let trackMute = {};
+
+        // Editor state
+        let activeTool = 'select'; // 'select', 'draw', 'erase'
+        let selectedNotes = new Set(); // Set of note indexes (strings/numbers)
+        let manualNoteIdCounter = 1000000;
+        
+        // Mouse/Drag state variables
+        let isDrawingNote = false;
+        let drawStartT = 0;
+        let drawStartP = 0;
+        let drawCurrentT = 0;
+        
+        let isResizingNote = false;
+        let resizingNoteObj = null;
+        let resizingEdgeSide = null; // 'start' or 'end'
+        
+        let isDraggingNotes = false;
+        let dragNotesStartT = 0;
+        let dragNotesStartP = 0;
+        let dragNotesOriginalStates = []; // array of {note, startTime, endTime, pitch}
+
+        let isBoxSelecting = false;
+        let boxSelectStartT = 0;
+        let boxSelectStartP = 0;
+        let boxSelectCurrentT = 0;
+        let boxSelectCurrentP = 0;
+
+        // Undo / Redo stacks
+        let undoStack = [];
+        let redoStack = [];
+
+        function saveHistory() {
+            undoStack.push(JSON.stringify(pianoRollNotes));
+            if (undoStack.length > 50) {
+                undoStack.shift();
+            }
+            redoStack = [];
+            updateUndoRedoButtons();
+        }
+
+        function updateUndoRedoButtons() {
+            btnUndo.disabled = (undoStack.length === 0);
+            btnRedo.disabled = (redoStack.length === 0);
+        }
+
+        function triggerUndo() {
+            if (undoStack.length === 0) return;
+            redoStack.push(JSON.stringify(pianoRollNotes));
+            const prevStateStr = undoStack.pop();
+            pianoRollNotes = JSON.parse(prevStateStr);
+            rebuildNotesIndex();
+            updateUndoRedoButtons();
+            queuePianoRollRender();
+        }
+
+        function triggerRedo() {
+            if (redoStack.length === 0) return;
+            undoStack.push(JSON.stringify(pianoRollNotes));
+            const nextStateStr = redoStack.pop();
+            pianoRollNotes = JSON.parse(nextStateStr);
+            rebuildNotesIndex();
+            updateUndoRedoButtons();
+            queuePianoRollRender();
+        }
+
+        function rebuildNotesIndex() {
+            notesByIndex = {};
+            instrumentNoteCounts = {};
+            prDetectedMinPitch = 127;
+            prDetectedMaxPitch = 0;
+            
+            const instruments = new Set();
+            
+            for (const note of pianoRollNotes) {
+                notesByIndex[note.index] = note;
+                
+                if (!instrumentNoteCounts[note.instrument]) {
+                    instrumentNoteCounts[note.instrument] = 0;
+                }
+                instrumentNoteCounts[note.instrument]++;
+                instruments.add(note.instrument);
+                
+                if (note.pitch < prDetectedMinPitch) prDetectedMinPitch = note.pitch;
+                if (note.pitch > prDetectedMaxPitch) prDetectedMaxPitch = note.pitch;
+            }
+            
+            refreshActiveInstrumentDropdown(instruments);
+        }
+
+        function refreshActiveInstrumentDropdown(instrumentsSet) {
+            const currentVal = selectActiveInstrument.value;
+            selectActiveInstrument.innerHTML = '';
+            
+            if (instrumentsSet.size === 0) {
+                instrumentsSet.add('Piano');
+            }
+            
+            instrumentsSet.forEach(inst => {
+                const opt = document.createElement('option');
+                opt.value = inst;
+                opt.textContent = inst;
+                selectActiveInstrument.appendChild(opt);
+            });
+            
+            if (instrumentsSet.has(currentVal)) {
+                selectActiveInstrument.value = currentVal;
+            }
+        }
+
+        // Bind Toolbar Editor Buttons
+        btnToolSelect.addEventListener('click', () => {
+            activeTool = 'select';
+            btnToolSelect.classList.add('active');
+            btnToolDraw.classList.remove('active');
+            btnToolErase.classList.remove('active');
+            selectedNotes.clear();
+            queuePianoRollRender();
+        });
+
+        btnToolDraw.addEventListener('click', () => {
+            activeTool = 'draw';
+            btnToolDraw.classList.add('active');
+            btnToolSelect.classList.remove('active');
+            btnToolErase.classList.remove('active');
+            selectedNotes.clear();
+            queuePianoRollRender();
+        });
+
+        btnToolErase.addEventListener('click', () => {
+            activeTool = 'erase';
+            btnToolErase.classList.add('active');
+            btnToolSelect.classList.remove('active');
+            btnToolDraw.classList.remove('active');
+            selectedNotes.clear();
+            queuePianoRollRender();
+        });
+
+        btnUndo.addEventListener('click', () => {
+            triggerUndo();
+        });
+
+        btnRedo.addEventListener('click', () => {
+            triggerRedo();
+        });
+
+        // Sliders binding
+        sliderVolAudio.addEventListener('input', function() {
+            volAudio = parseFloat(this.value);
+            labelVolAudio.textContent = Math.round(volAudio * 100) + '%';
+            originalAudioPlayer.volume = volAudio;
+        });
+
+        sliderVolSynth.addEventListener('input', function() {
+            volSynth = parseFloat(this.value);
+            labelVolSynth.textContent = Math.round(volSynth * 100) + '%';
+        });
+
+        sliderSpeed.addEventListener('input', function() {
+            playbackSpeedRate = parseFloat(this.value);
+            labelSpeed.textContent = playbackSpeedRate.toFixed(2) + 'x';
+            originalAudioPlayer.playbackRate = playbackSpeedRate;
+            originalAudioPlayer.defaultPlaybackRate = playbackSpeedRate;
+        });
+
+        // Keyboard Event Bindings
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
+                return;
+            }
+
+            const isCtrl = e.ctrlKey || e.metaKey;
+
+            if (isCtrl && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                triggerUndo();
+            }
+            else if (isCtrl && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                triggerRedo();
+            }
+            else if (isCtrl && e.key === '1') {
+                e.preventDefault();
+                btnToolSelect.click();
+            }
+            else if (isCtrl && e.key === '2') {
+                e.preventDefault();
+                btnToolDraw.click();
+            }
+            else if (isCtrl && e.key === '3') {
+                e.preventDefault();
+                btnToolErase.click();
+            }
+            else if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedNotes.size > 0) {
+                    e.preventDefault();
+                    saveHistory();
+                    pianoRollNotes = pianoRollNotes.filter(n => !selectedNotes.has(n.index));
+                    selectedNotes.clear();
+                    rebuildNotesIndex();
+                    queuePianoRollRender();
+                }
+            }
+            else if (e.key === 'ArrowUp') {
+                if (selectedNotes.size > 0) {
+                    e.preventDefault();
+                    saveHistory();
+                    for (const note of pianoRollNotes) {
+                        if (selectedNotes.has(note.index)) {
+                            note.pitch = Math.min(127, note.pitch + 1);
+                            playSynthNote(note.pitch, 0.25);
+                        }
+                    }
+                    rebuildNotesIndex();
+                    queuePianoRollRender();
+                }
+            }
+            else if (e.key === 'ArrowDown') {
+                if (selectedNotes.size > 0) {
+                    e.preventDefault();
+                    saveHistory();
+                    for (const note of pianoRollNotes) {
+                        if (selectedNotes.has(note.index)) {
+                            note.pitch = Math.max(0, note.pitch - 1);
+                            playSynthNote(note.pitch, 0.25);
+                        }
+                    }
+                    rebuildNotesIndex();
+                    queuePianoRollRender();
+                }
+            }
+            else if (e.key === 'ArrowLeft') {
+                if (selectedNotes.size > 0) {
+                    e.preventDefault();
+                    saveHistory();
+                    const shiftAmt = -0.1;
+                    for (const note of pianoRollNotes) {
+                        if (selectedNotes.has(note.index)) {
+                            note.startTime = Math.max(0, note.startTime + shiftAmt);
+                            if (note.endTime !== null) {
+                                note.endTime = Math.max(note.startTime + 0.05, note.endTime + shiftAmt);
+                            }
+                        }
+                    }
+                    queuePianoRollRender();
+                }
+            }
+            else if (e.key === 'ArrowRight') {
+                if (selectedNotes.size > 0) {
+                    e.preventDefault();
+                    saveHistory();
+                    const shiftAmt = 0.1;
+                    for (const note of pianoRollNotes) {
+                        if (selectedNotes.has(note.index)) {
+                            note.startTime = note.startTime + shiftAmt;
+                            if (note.endTime !== null) {
+                                note.endTime = note.endTime + shiftAmt;
+                            }
+                        }
+                    }
+                    queuePianoRollRender();
+                }
+            }
+        });
 
         let transcribeAbortController = null;
         
@@ -1179,12 +1625,14 @@
             transcribeStatus.textContent = 'Starting processing run...';
             notesVisualizer.innerHTML = '';
 
-            // Reset Piano Roll
+            // Reset Piano Roll & Editor state
             pianoRollNotes = [];
             notesByIndex = {};
             instrumentColorMap = {};
             instrumentNoteCounts = {};
             trackVisibility = {};
+            trackSolo = {};
+            trackMute = {};
             prColorIdx = 0;
             prViewStart = 0;
             prViewEnd = 15;
@@ -1195,6 +1643,17 @@
             btnPrFollow.textContent = 'Following';
             pianoRollPanel.classList.add('active');
             trackLegend.innerHTML = '<span class="track-legend-title">Detected Tracks</span>';
+            
+            // Editor resets
+            selectedNotes.clear();
+            undoStack = [];
+            redoStack = [];
+            updateUndoRedoButtons();
+            
+            originalAudioLoaded = false;
+            originalAudioPlayer.src = '';
+            originalAudioPlayer.load();
+
             queuePianoRollRender();
 
             btnTranscribe.disabled = true;
@@ -1405,6 +1864,17 @@
                 }
                 generatedMidiBytes = bytes;
 
+                // Load original audio for playback
+                originalAudioPlayer.src = `${API_BASE}/audio?t=${Date.now()}`;
+                originalAudioPlayer.load();
+                originalAudioLoaded = true;
+                originalAudioPlayer.volume = volAudio;
+                originalAudioPlayer.playbackRate = playbackSpeedRate;
+                originalAudioPlayer.defaultPlaybackRate = playbackSpeedRate;
+
+                // Refresh track selectors & indexes
+                rebuildNotesIndex();
+
                 resultPanel.style.display = 'flex';
 
                 // Fit the piano roll to show all notes
@@ -1412,11 +1882,123 @@
             }
         }
 
+        function exportMidi(notes) {
+            const events = [];
+            const ticksPerBeat = 192;
+            const secsPerBeat = 0.5;
+            const ticksPerSec = ticksPerBeat / secsPerBeat;
+            
+            for (const note of notes) {
+                const startTick = Math.round(note.startTime * ticksPerSec);
+                const endTick = Math.round((note.endTime || (note.startTime + 0.5)) * ticksPerSec);
+                
+                let program = 0;
+                const instName = (note.instrument || '').toLowerCase();
+                if (instName.includes('guitar')) program = 24;
+                else if (instName.includes('bass')) program = 32;
+                else if (instName.includes('violin') || instName.includes('strings')) program = 40;
+                else if (instName.includes('trumpet')) program = 56;
+                else if (instName.includes('flute')) program = 73;
+                else if (instName.includes('drum') || instName.includes('perc')) program = 118;
+                
+                events.push({
+                    tick: startTick,
+                    type: 0x90, // Note On
+                    pitch: note.pitch,
+                    velocity: 80,
+                    program: program
+                });
+                events.push({
+                    tick: endTick,
+                    type: 0x80, // Note Off
+                    pitch: note.pitch,
+                    velocity: 0,
+                    program: program
+                });
+            }
+            
+            events.sort((a, b) => a.tick - b.tick);
+            
+            const trackData = [];
+            let lastTick = 0;
+            
+            // Set tempo: 120 BPM
+            trackData.push(0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20);
+
+            // Program changes
+            const programsUsed = [...new Set(events.map(e => e.program))];
+            const channelMap = {};
+            let nextChannel = 0;
+            for (const p of programsUsed) {
+                const ch = nextChannel === 9 ? 10 : nextChannel;
+                if (p === 118) {
+                    channelMap[p] = 9;
+                } else {
+                    channelMap[p] = ch;
+                    nextChannel = (ch + 1) % 16;
+                }
+                
+                trackData.push(0x00, 0xC0 | channelMap[p], p);
+            }
+            
+            function writeVLQ(val) {
+                const buffer = [];
+                let v = val;
+                buffer.push(v & 0x7F);
+                v >>>= 7;
+                while (v > 0) {
+                    buffer.push((v & 0x7F) | 0x80);
+                    v >>>= 7;
+                }
+                buffer.reverse();
+                return buffer;
+            }
+            
+            for (const ev of events) {
+                const delta = ev.tick - lastTick;
+                lastTick = ev.tick;
+                
+                trackData.push(...writeVLQ(delta));
+                
+                const ch = channelMap[ev.program] || 0;
+                trackData.push(ev.type | ch, ev.pitch, ev.velocity);
+            }
+            
+            // End of track meta event
+            trackData.push(0x00, 0xFF, 0x2F, 0x00);
+            
+            const header = [
+                0x4D, 0x54, 0x68, 0x64,
+                0x00, 0x00, 0x00, 0x06,
+                0x00, 0x00,
+                0x00, 0x01,
+                0x00, ticksPerBeat
+            ];
+            
+            const trackHeader = [
+                0x4D, 0x54, 0x72, 0x6B,
+                (trackData.length >>> 24) & 0xFF,
+                (trackData.length >>> 16) & 0xFF,
+                (trackData.length >>> 8) & 0xFF,
+                trackData.length & 0xFF
+            ];
+            
+            return new Uint8Array([...header, ...trackHeader, ...trackData]);
+        }
+
+        function getCurrentMidiBytes() {
+            if (pianoRollNotes.length > 0) {
+                return exportMidi(pianoRollNotes);
+            }
+            return generatedMidiBytes;
+        }
+
         // Action: Download MIDI
         btnDownloadMidi.addEventListener('click', () => {
-            if (!generatedMidiBytes) return;
+            const bytes = getCurrentMidiBytes();
+            if (!bytes) return;
             
-            const blob = new Blob([generatedMidiBytes], { type: 'audio/midi' });
+            const blob = new Blob([bytes], { type: 'audio/midi' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             
@@ -1438,14 +2020,15 @@
 
         // Action: Auralize (Synthesize MIDI back to WAV audio)
         btnAuralize.addEventListener('click', async () => {
-            if (!generatedMidiBytes) return;
+            const bytes = getCurrentMidiBytes();
+            if (!bytes) return;
 
             addLog("Synthesizing transcribed MIDI into WAV audio...", "system");
             btnAuralize.disabled = true;
 
             try {
                 // Convert MIDI bytes back to a file
-                const midiBlob = new Blob([generatedMidiBytes], { type: 'audio/midi' });
+                const midiBlob = new Blob([bytes], { type: 'audio/midi' });
                 const formData = new FormData();
                 formData.append('midi', midiBlob, 'transcription.mid');
                 formData.append('mode', 'synth'); // synthesis only
@@ -1498,6 +2081,43 @@
             return BLACK_KEYS.has(pitch % 12);
         }
 
+        function getPitchRange() {
+            let pitchMin = 48;
+            let pitchMax = 84;
+            if (pianoRollNotes.length > 0) {
+                pitchMin = Math.max(0, prDetectedMinPitch - 3);
+                pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+            }
+            const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
+            return { pitchMin, pitchMax, pitchRange };
+        }
+
+        function getXCoords() {
+            const rect = pianoRollCanvas.getBoundingClientRect();
+            const drawW = rect.width - PR_LEFT;
+            const timeSpan = prViewEnd - prViewStart;
+            const pxPerSec = drawW / timeSpan;
+            return { drawW, timeSpan, pxPerSec };
+        }
+
+        function getYCoords() {
+            const rect = pianoRollCanvas.getBoundingClientRect();
+            const drawH = rect.height - PR_TOP;
+            const { pitchMin, pitchMax, pitchRange } = getPitchRange();
+            const pxPerPitch = drawH / pitchRange;
+            return { drawH, pitchMin, pitchMax, pitchRange, pxPerPitch };
+        }
+
+        function xToTime(x) {
+            const { pxPerSec } = getXCoords();
+            return prViewStart + (x - PR_LEFT) / pxPerSec;
+        }
+
+        function yToPitch(y) {
+            const { pitchMax, pxPerPitch } = getYCoords();
+            return pitchMax - Math.floor((y - PR_TOP) / pxPerPitch);
+        }
+
         function renderPianoRoll() {
             const dpr = window.devicePixelRatio || 1;
             const rect = pianoRollWrapper.getBoundingClientRect();
@@ -1510,20 +2130,8 @@
             prCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
             const ctx = prCtx;
 
-            // Pitch range: default to C3-C6 (48-84) if no notes yet
-            let pitchMin = 48;
-            let pitchMax = 84;
-            if (pianoRollNotes.length > 0) {
-                pitchMin = Math.max(0, prDetectedMinPitch - 3);
-                pitchMax = Math.min(127, prDetectedMaxPitch + 3);
-            }
-            const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
-
-            const drawW = w - PR_LEFT;
-            const drawH = h - PR_TOP;
-            const pxPerPitch = drawH / pitchRange;
-            const timeSpan = prViewEnd - prViewStart;
-            const pxPerSec = drawW / timeSpan;
+            const { drawW, timeSpan, pxPerSec } = getXCoords();
+            const { drawH, pitchMin, pitchMax, pitchRange, pxPerPitch } = getYCoords();
 
             // Background
             ctx.fillStyle = '#08090d';
@@ -1569,11 +2177,11 @@
 
             // Draw notes
             const cornerR = Math.min(3, pxPerPitch / 3);
-            for (const note of pianoRollNotes) {
-                if (!trackVisibility[note.instrument]) continue;
-                if (note.pitch < pitchMin || note.pitch > pitchMax) continue;
+            
+            function drawSingleNote(note, isSelected = false) {
+                if (note.pitch < pitchMin || note.pitch > pitchMax) return;
                 const noteEnd = note.endTime !== null ? note.endTime : (prViewEnd + 0.5);
-                if (noteEnd < prViewStart || note.startTime > prViewEnd) continue;
+                if (noteEnd < prViewStart || note.startTime > prViewEnd) return;
 
                 const x = PR_LEFT + (note.startTime - prViewStart) * pxPerSec;
                 const xEnd = PR_LEFT + (noteEnd - prViewStart) * pxPerSec;
@@ -1581,16 +2189,24 @@
                 const startX = Math.max(x, PR_LEFT);
                 const endX = Math.max(xEnd, PR_LEFT);
                 const noteW = endX - startX;
-                if (noteW <= 0) continue;
+                if (noteW <= 0) return;
 
                 const y = PR_TOP + (pitchMax - note.pitch) * pxPerPitch + 1;
                 const noteH = pxPerPitch - 2;
                 const color = instrumentColorMap[note.instrument] || '#6366f1';
 
                 ctx.fillStyle = color;
-                ctx.globalAlpha = 0.85;
+                ctx.globalAlpha = isSelected ? 1.0 : 0.85;
                 prRoundRect(ctx, startX, y, noteW, Math.max(noteH, 2), cornerR);
                 ctx.fill();
+
+                // Draw select highlight border
+                if (isSelected) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5;
+                    prRoundRect(ctx, startX, y, noteW, Math.max(noteH, 2), cornerR);
+                    ctx.stroke();
+                }
 
                 // Subtle top highlight
                 ctx.globalAlpha = 0.25;
@@ -1606,6 +2222,38 @@
                     ctx.fillRect(endX - 3, y, 3, Math.max(noteH, 2));
                     ctx.globalAlpha = 1;
                 }
+            }
+
+            // Draw all notes in database
+            for (const note of pianoRollNotes) {
+                if (!isTrackActive(note.instrument)) continue;
+                drawSingleNote(note, selectedNotes.has(note.index));
+            }
+
+            // Draw active drawn note (if drawing in progress)
+            if (isDrawingNote && activeDrawnNote) {
+                drawSingleNote(activeDrawnNote, false);
+            }
+
+            // Draw selection box (if box selecting)
+            if (isBoxSelecting) {
+                const boxX = PR_LEFT + (Math.min(boxSelectStartT, boxSelectCurrentT) - prViewStart) * pxPerSec;
+                const boxXEnd = PR_LEFT + (Math.max(boxSelectStartT, boxSelectCurrentT) - prViewStart) * pxPerSec;
+                
+                const y1 = PR_TOP + (pitchMax - boxSelectStartP) * pxPerPitch;
+                const y2 = PR_TOP + (pitchMax - boxSelectCurrentP) * pxPerPitch;
+                
+                const boxY = Math.min(y1, y2);
+                const boxYEnd = Math.max(y1, y2) + pxPerPitch;
+                
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.strokeRect(boxX, boxY, boxXEnd - boxX, boxYEnd - boxY);
+                ctx.setLineDash([]); // clear
+                
+                ctx.fillStyle = 'rgba(99, 102, 241, 0.1)';
+                ctx.fillRect(boxX, boxY, boxXEnd - boxX, boxYEnd - boxY);
             }
 
             // Draw Piano Keyboard Keys on the Left (over the note grid)
@@ -1732,18 +2380,63 @@
             return 60;
         }
 
+        function isTrackActive(inst) {
+            const hasSolo = Object.values(trackSolo).some(v => v === true);
+            if (hasSolo) {
+                return trackSolo[inst] === true && trackMute[inst] !== true;
+            }
+            return trackMute[inst] !== true;
+        }
+
         function updateTrackLegend() {
             trackLegend.innerHTML = '<span class="track-legend-title">Detected Tracks</span>';
             for (const [inst, color] of Object.entries(instrumentColorMap)) {
                 const count = instrumentNoteCounts[inst] || 0;
                 const item = document.createElement('div');
-                item.className = `track-item${trackVisibility[inst] ? '' : ' muted'}`;
-                item.innerHTML = `<span class="track-color-dot" style="background:${color}"></span><span>${inst}</span><span class="track-note-count">${count}</span>`;
-                item.addEventListener('click', () => {
-                    trackVisibility[inst] = !trackVisibility[inst];
-                    item.classList.toggle('muted');
+                item.className = 'track-item';
+                if (!isTrackActive(inst)) {
+                    item.classList.add('muted');
+                }
+                
+                const infoSpan = document.createElement('span');
+                infoSpan.style.display = 'flex';
+                infoSpan.style.alignItems = 'center';
+                infoSpan.style.gap = '0.35rem';
+                infoSpan.innerHTML = `<span class="track-color-dot" style="background:${color}"></span><span>${inst}</span><span class="track-note-count">${count}</span>`;
+                infoSpan.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    trackMute[inst] = !trackMute[inst];
                     queuePianoRollRender();
                 });
+                item.appendChild(infoSpan);
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'track-item-actions';
+                
+                const btnMute = document.createElement('button');
+                btnMute.className = `track-action-btn${trackMute[inst] ? ' active-mute' : ''}`;
+                btnMute.title = trackMute[inst] ? 'Unmute Track' : 'Mute Track';
+                btnMute.textContent = 'M';
+                btnMute.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    trackMute[inst] = !trackMute[inst];
+                    queuePianoRollRender();
+                });
+                
+                const btnSolo = document.createElement('button');
+                btnSolo.className = `track-action-btn${trackSolo[inst] ? ' active-solo' : ''}`;
+                btnSolo.title = trackSolo[inst] ? 'De-solo Track' : 'Solo Track';
+                btnSolo.textContent = 'S';
+                btnSolo.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    trackSolo[inst] = !trackSolo[inst];
+                    queuePianoRollRender();
+                });
+                
+                actionsDiv.appendChild(btnMute);
+                actionsDiv.appendChild(btnSolo);
+                item.appendChild(actionsDiv);
+                
                 trackLegend.appendChild(item);
             }
         }
@@ -1760,53 +2453,303 @@
             queuePianoRollRender();
         }
 
-        // Piano Roll interaction: drag to pan OR click keyboard key
+        let isScrubbing = false;
+
+        function getNoteAt(mouseX, mouseY) {
+            const time = xToTime(mouseX);
+            const pitch = yToPitch(mouseY);
+            
+            const { pxPerSec } = getXCoords();
+            
+            for (const note of pianoRollNotes) {
+                if (!isTrackActive(note.instrument)) continue;
+                if (note.pitch !== pitch) continue;
+                
+                const noteEnd = note.endTime !== null ? note.endTime : (prViewEnd + 0.5);
+                if (time >= note.startTime && time <= noteEnd) {
+                    const noteX = PR_LEFT + (note.startTime - prViewStart) * pxPerSec;
+                    const noteXEnd = PR_LEFT + (noteEnd - prViewStart) * pxPerSec;
+                    
+                    let edge = 'center';
+                    if (mouseX >= noteX && mouseX <= noteX + 6) {
+                        edge = 'start';
+                    } else if (mouseX >= noteXEnd - 6 && mouseX <= noteXEnd) {
+                        edge = 'end';
+                    }
+                    
+                    return { note, edge };
+                }
+            }
+            return null;
+        }
+
         pianoRollWrapper.addEventListener('mousedown', (e) => {
             const rect = pianoRollCanvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            
+
+            // 1. Clicked Keyboard
             if (mouseX <= PR_LEFT && mouseY > PR_TOP) {
-                // Clicked on the piano keyboard keys!
-                const drawH = rect.height - PR_TOP;
-                // Pitch range: default to C3-C6 (48-84) if no notes yet
-                let pitchMin = 48;
-                let pitchMax = 84;
-                if (pianoRollNotes.length > 0) {
-                    pitchMin = Math.max(0, prDetectedMinPitch - 3);
-                    pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+                const pitch = yToPitch(mouseY);
+                if (pitch >= 0 && pitch <= 127) {
+                    playSynthNote(pitch);
                 }
-                const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
-                const pxPerPitch = drawH / pitchRange;
-                
-                const clickedPitch = pitchMax - Math.floor((mouseY - PR_TOP) / pxPerPitch);
-                if (clickedPitch >= 0 && clickedPitch <= 127) {
-                    playSynthNote(clickedPitch);
+                return;
+            }
+
+            // 2. Clicked Timeline Ruler (Scrubbing)
+            if (mouseY <= PR_TOP && mouseX > PR_LEFT) {
+                isScrubbing = true;
+                const time = Math.max(0, xToTime(mouseX));
+                playbackTime = time;
+                if (originalAudioLoaded && originalAudioPlayer.src) {
+                    originalAudioPlayer.currentTime = time;
                 }
-            } else {
-                // Standard panning drag logic
-                prDragging = true;
-                prDragStartX = e.clientX;
-                prDragViewStart = prViewStart;
-                prFollowing = false;
-                btnPrFollow.classList.remove('active');
-                btnPrFollow.textContent = 'Follow';
+                queuePianoRollRender();
+                return;
+            }
+
+            // 3. Clicked Grid
+            if (mouseX > PR_LEFT && mouseY > PR_TOP) {
+                const time = xToTime(mouseX);
+                const pitch = yToPitch(mouseY);
+
+                if (activeTool === 'erase') {
+                    const match = getNoteAt(mouseX, mouseY);
+                    if (match) {
+                        saveHistory();
+                        pianoRollNotes = pianoRollNotes.filter(n => n.index !== match.note.index);
+                        selectedNotes.delete(match.note.index);
+                        rebuildNotesIndex();
+                        queuePianoRollRender();
+                    }
+                    return;
+                }
+
+                if (activeTool === 'draw') {
+                    saveHistory();
+                    isDrawingNote = true;
+                    drawStartT = time;
+                    drawStartP = pitch;
+                    
+                    const instName = selectActiveInstrument.value || 'Piano';
+                    activeDrawnNote = {
+                        pitch: pitch,
+                        startTime: time,
+                        endTime: time + 0.1,
+                        instrument: instName,
+                        index: manualNoteIdCounter++
+                    };
+                    playSynthNote(pitch, 0.25);
+                    queuePianoRollRender();
+                    return;
+                }
+
+                if (activeTool === 'select') {
+                    const match = getNoteAt(mouseX, mouseY);
+                    
+                    if (match) {
+                        const note = match.note;
+                        
+                        if (e.shiftKey) {
+                            if (selectedNotes.has(note.index)) {
+                                selectedNotes.delete(note.index);
+                            } else {
+                                selectedNotes.add(note.index);
+                            }
+                        } else {
+                            if (!selectedNotes.has(note.index)) {
+                                selectedNotes.clear();
+                                selectedNotes.add(note.index);
+                            }
+                        }
+                        
+                        if (match.edge === 'start' || match.edge === 'end') {
+                            isResizingNote = true;
+                            resizingNoteObj = note;
+                            resizingEdgeSide = match.edge;
+                        } else {
+                            isDraggingNotes = true;
+                            dragNotesStartT = time;
+                            dragNotesStartP = pitch;
+                            
+                            dragNotesOriginalStates = pianoRollNotes
+                                .filter(n => selectedNotes.has(n.index))
+                                .map(n => ({
+                                    note: n,
+                                    startTime: n.startTime,
+                                    endTime: n.endTime || (n.startTime + 0.5),
+                                    pitch: n.pitch
+                                }));
+                        }
+                        
+                        playSynthNote(note.pitch, 0.15);
+                        queuePianoRollRender();
+                    } else {
+                        if (e.shiftKey) {
+                            isBoxSelecting = true;
+                            boxSelectStartT = time;
+                            boxSelectStartP = pitch;
+                            boxSelectCurrentT = time;
+                            boxSelectCurrentP = pitch;
+                        } else {
+                            selectedNotes.clear();
+                            prDragging = true;
+                            prDragStartX = e.clientX;
+                            prDragViewStart = prViewStart;
+                            prFollowing = false;
+                            btnPrFollow.classList.remove('active');
+                            btnPrFollow.textContent = 'Follow';
+                        }
+                        queuePianoRollRender();
+                    }
+                }
             }
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (!prDragging) return;
-            const rect = pianoRollWrapper.getBoundingClientRect();
-            const drawW = rect.width - PR_LEFT;
-            const timeSpan = prViewEnd - prViewStart;
-            const dx = e.clientX - prDragStartX;
-            const timeDelta = -(dx / drawW) * timeSpan;
-            prViewStart = Math.max(0, prDragViewStart + timeDelta);
-            prViewEnd = prViewStart + timeSpan;
-            queuePianoRollRender();
+            const rect = pianoRollCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const time = xToTime(mouseX);
+            const pitch = yToPitch(mouseY);
+
+            // Cursor styling update on hover
+            if (activeTool === 'select' && !prDragging && !isDraggingNotes && !isResizingNote && !isBoxSelecting) {
+                if (mouseX > PR_LEFT && mouseY > PR_TOP) {
+                    const match = getNoteAt(mouseX, mouseY);
+                    if (match) {
+                        if (match.edge === 'start' || match.edge === 'end') {
+                            pianoRollCanvas.style.cursor = 'ew-resize';
+                        } else {
+                            pianoRollCanvas.style.cursor = 'move';
+                        }
+                    } else {
+                        pianoRollCanvas.style.cursor = 'default';
+                    }
+                } else if (mouseY <= PR_TOP && mouseX > PR_LEFT) {
+                    pianoRollCanvas.style.cursor = 'col-resize';
+                } else {
+                    pianoRollCanvas.style.cursor = 'default';
+                }
+            } else if (activeTool === 'draw') {
+                pianoRollCanvas.style.cursor = 'crosshair';
+            } else if (activeTool === 'erase') {
+                pianoRollCanvas.style.cursor = 'no-drop';
+            }
+
+            if (prDragging) {
+                const drawW = rect.width - PR_LEFT;
+                const timeSpan = prViewEnd - prViewStart;
+                const dx = e.clientX - prDragStartX;
+                const timeDelta = -(dx / drawW) * timeSpan;
+                prViewStart = Math.max(0, prDragViewStart + timeDelta);
+                prViewEnd = prViewStart + timeSpan;
+                queuePianoRollRender();
+                return;
+            }
+
+            if (isScrubbing) {
+                playbackTime = Math.max(0, time);
+                if (originalAudioLoaded && originalAudioPlayer.src) {
+                    originalAudioPlayer.currentTime = playbackTime;
+                }
+                queuePianoRollRender();
+                return;
+            }
+
+            if (isDrawingNote && activeDrawnNote) {
+                activeDrawnNote.endTime = Math.max(activeDrawnNote.startTime + 0.05, time);
+                queuePianoRollRender();
+                return;
+            }
+
+            if (isResizingNote && resizingNoteObj) {
+                if (resizingEdgeSide === 'start') {
+                    const oldEnd = resizingNoteObj.endTime || (resizingNoteObj.startTime + 0.5);
+                    resizingNoteObj.startTime = Math.max(0, Math.min(oldEnd - 0.05, time));
+                } else {
+                    resizingNoteObj.endTime = Math.max(resizingNoteObj.startTime + 0.05, time);
+                }
+                queuePianoRollRender();
+                return;
+            }
+
+            if (isDraggingNotes && dragNotesOriginalStates.length > 0) {
+                const deltaT = time - dragNotesStartT;
+                const deltaP = Math.round(pitch - dragNotesStartP);
+                
+                for (const state of dragNotesOriginalStates) {
+                    state.note.startTime = Math.max(0, state.startTime + deltaT);
+                    if (state.note.endTime !== null) {
+                        state.note.endTime = Math.max(state.note.startTime + 0.05, state.endTime + deltaT);
+                    }
+                    state.note.pitch = Math.max(0, Math.min(127, state.pitch + deltaP));
+                }
+                queuePianoRollRender();
+                return;
+            }
+
+            if (isBoxSelecting) {
+                boxSelectCurrentT = time;
+                boxSelectCurrentP = pitch;
+                queuePianoRollRender();
+                return;
+            }
         });
 
-        window.addEventListener('mouseup', () => { prDragging = false; });
+        window.addEventListener('mouseup', () => {
+            if (prDragging) {
+                prDragging = false;
+            }
+            if (isScrubbing) {
+                isScrubbing = false;
+            }
+            if (isDrawingNote && activeDrawnNote) {
+                saveHistory();
+                pianoRollNotes.push(activeDrawnNote);
+                activeDrawnNote = null;
+                isDrawingNote = false;
+                rebuildNotesIndex();
+                queuePianoRollRender();
+            }
+            if (isResizingNote) {
+                saveHistory();
+                isResizingNote = false;
+                resizingNoteObj = null;
+                queuePianoRollRender();
+            }
+            if (isDraggingNotes) {
+                saveHistory();
+                isDraggingNotes = false;
+                dragNotesOriginalStates = [];
+                rebuildNotesIndex();
+                queuePianoRollRender();
+            }
+            if (isBoxSelecting) {
+                const minT = Math.min(boxSelectStartT, boxSelectCurrentT);
+                const maxT = Math.max(boxSelectStartT, boxSelectCurrentT);
+                const minP = Math.min(boxSelectStartP, boxSelectCurrentP);
+                const maxP = Math.max(boxSelectStartP, boxSelectCurrentP);
+                
+                selectedNotes.clear();
+                for (const note of pianoRollNotes) {
+                    if (!isTrackActive(note.instrument)) continue;
+                    const noteEnd = note.endTime || (note.startTime + 0.5);
+                    const notePitch = note.pitch;
+                    
+                    const timeIntersect = (note.startTime <= maxT && noteEnd >= minT);
+                    const pitchIntersect = (notePitch >= minP && notePitch <= maxP);
+                    
+                    if (timeIntersect && pitchIntersect) {
+                        selectedNotes.add(note.index);
+                    }
+                }
+                isBoxSelecting = false;
+                queuePianoRollRender();
+            }
+        });
 
         // Wheel to zoom
         pianoRollWrapper.addEventListener('wheel', (e) => {
@@ -1860,14 +2803,36 @@
             btnPrPlay.style.background = '#ef4444';
             btnPrPlay.style.borderColor = '#ef4444';
             
+            // Sync with sliders
+            originalAudioPlayer.volume = volAudio;
+            originalAudioPlayer.playbackRate = playbackSpeedRate;
+            originalAudioPlayer.defaultPlaybackRate = playbackSpeedRate;
+
             playbackTime = prViewStart; // Play from current view start
+            
+            // Limit start time to song length
+            let maxTime = 0;
+            for (const n of pianoRollNotes) {
+                const t = n.endTime || n.startTime;
+                if (t > maxTime) maxTime = t;
+            }
+            if (playbackTime >= maxTime) {
+                playbackTime = 0;
+                prViewStart = 0;
+            }
+
+            if (originalAudioLoaded && originalAudioPlayer.src) {
+                originalAudioPlayer.currentTime = playbackTime;
+                originalAudioPlayer.play().catch(e => console.error("Audio playback start failed:", e));
+            }
+            
             playbackLastTick = performance.now();
             
             // Sort notes by start time
-            const sortedNotes = [...pianoRollNotes].sort((a, b) => a.startTime - b.startTime);
+            let sortedNotes = [...pianoRollNotes].sort((a, b) => a.startTime - b.startTime);
             let noteIndex = 0;
             
-            // Fast-forward noteIndex past playbackTime
+            // Find noteIndex for current playbackTime
             while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime < playbackTime) {
                 noteIndex++;
             }
@@ -1875,20 +2840,50 @@
             playbackInterval = requestAnimationFrame(function tick(now) {
                 if (!isPlaying) return;
                 
-                const delta = (now - playbackLastTick) / 1000;
+                let prevTime = playbackTime;
+                
+                if (originalAudioLoaded && originalAudioPlayer.src && !originalAudioPlayer.paused) {
+                    // Sync playhead exactly to the HTML5 audio element currentTime
+                    playbackTime = originalAudioPlayer.currentTime;
+                    // If audio ended, stop playback
+                    if (originalAudioPlayer.ended) {
+                        stopPlayback();
+                        return;
+                    }
+                } else {
+                    const delta = ((now - playbackLastTick) / 1000) * playbackSpeedRate;
+                    playbackTime += delta;
+                }
                 playbackLastTick = now;
                 
-                const prevTime = playbackTime;
-                playbackTime += delta;
-                
-                // Play notes falling in this frame
-                while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime <= playbackTime) {
-                    const note = sortedNotes[noteIndex];
-                    if (note.startTime >= prevTime && trackVisibility[note.instrument]) {
-                        const duration = note.endTime ? (note.endTime - note.startTime) : 0.5;
-                        playSynthNote(note.pitch, Math.max(0.1, duration));
+                // Detect jumps (e.g. loops, scratching, audio player skip)
+                const isJump = (playbackTime < prevTime) || (playbackTime - prevTime > 0.5);
+                if (isJump) {
+                    // Reset note pointer to new time
+                    noteIndex = 0;
+                    while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime < playbackTime) {
+                        noteIndex++;
                     }
-                    noteIndex++;
+                    prevTime = playbackTime;
+                }
+                
+                // Play synth notes falling in this tick interval
+                if (volSynth > 0.01) {
+                    while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime <= playbackTime) {
+                        const note = sortedNotes[noteIndex];
+                        if (note.startTime >= prevTime && isTrackActive(note.instrument)) {
+                            const duration = note.endTime ? (note.endTime - note.startTime) : 0.5;
+                            // Scale duration by playback speed rate
+                            const playDuration = Math.max(0.1, duration) / playbackSpeedRate;
+                            playSynthNote(note.pitch, playDuration);
+                        }
+                        noteIndex++;
+                    }
+                } else {
+                    // If synth volume is zero, just skip the notes silently
+                    while (noteIndex < sortedNotes.length && sortedNotes[noteIndex].startTime <= playbackTime) {
+                        noteIndex++;
+                    }
                 }
                 
                 // If following, auto-pan the view
@@ -1901,11 +2896,6 @@
                 queuePianoRollRender();
                 
                 // Stop at the end of the song
-                let maxTime = 0;
-                for (const n of pianoRollNotes) {
-                    const t = n.endTime || n.startTime;
-                    if (t > maxTime) maxTime = t;
-                }
                 if (playbackTime > maxTime + 0.5) {
                     stopPlayback();
                     return;
@@ -1920,6 +2910,9 @@
             if (playbackInterval) {
                 cancelAnimationFrame(playbackInterval);
                 playbackInterval = null;
+            }
+            if (originalAudioLoaded) {
+                originalAudioPlayer.pause();
             }
             btnPrPlay.textContent = 'Play';
             btnPrPlay.style.background = '#10b981';
