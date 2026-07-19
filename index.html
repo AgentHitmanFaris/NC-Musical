@@ -80,6 +80,13 @@
 
         .server-status {
             display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+
+        .status-badge {
+            display: flex;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
@@ -89,6 +96,13 @@
             border-radius: 99px;
             border: 1px solid rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
+        }
+
+        .gpu-badge {
+            font-size: 0.75rem;
+            color: var(--accent);
+            font-weight: 500;
+            margin-right: 0.5rem;
         }
 
         .status-dot {
@@ -173,7 +187,42 @@
             border-color: var(--primary);
         }
 
-        /* Dropzone Styling */
+        /* Tabs styling */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 0.3rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.6rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-family: var(--font-main);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        /* Dropzone & Input Panel Styling */
+        .input-panel {
+            min-height: 250px;
+        }
+
         .dropzone {
             border: 2px dashed rgba(255, 255, 255, 0.1);
             border-radius: 1rem;
@@ -216,6 +265,25 @@
         .dropzone-text p {
             font-size: 0.85rem;
             color: var(--text-muted);
+        }
+
+        .youtube-input-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.2rem;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            min-height: 250px;
+        }
+
+        .youtube-input-container svg {
+            width: 48px;
+            height: 48px;
+            color: #ef4444;
         }
 
         .file-info {
@@ -331,6 +399,18 @@
             color: var(--text-muted);
         }
 
+        .time-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-family: var(--font-mono);
+            background: rgba(6, 182, 212, 0.05);
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(6, 182, 212, 0.15);
+        }
+
         /* Event stream/visualization */
         .notes-visualizer {
             flex-grow: 1;
@@ -343,8 +423,9 @@
             font-family: var(--font-mono);
             font-size: 0.85rem;
             display: flex;
-            flex-direction: column-reverse;
+            flex-direction: column;
             gap: 0.25rem;
+            scroll-behavior: smooth;
         }
 
         .note-log {
@@ -463,8 +544,11 @@
             MuScriptor <span class="badge">AMT</span>
         </div>
         <div class="server-status">
-            <div id="statusDot" class="status-dot"></div>
-            <span id="statusText">Checking server...</span>
+            <div class="status-badge">
+                <span id="gpuInfo" class="gpu-badge">GPU: Detecting...</span>
+                <div id="statusDot" class="status-dot"></div>
+                <span id="statusText">Checking...</span>
+            </div>
         </div>
     </header>
 
@@ -506,19 +590,40 @@
 
         <!-- Main Dashboard -->
         <section class="main-panel">
-            <!-- Upload Dropzone -->
-            <div class="glass-panel" id="dropzonePanel">
-                <h2>Audio Input</h2>
-                <div class="dropzone" id="dropzone">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                    </svg>
-                    <div class="dropzone-text">
-                        <h3>Drag & drop audio or video file here</h3>
-                        <p>Supports MP3, WAV, FLAC, M4A, OGG, MP4, MKV, MOV, AVI</p>
-                    </div>
-                    <input type="file" id="audioFile" accept="audio/*,video/*" style="display: none;">
+            <!-- Input Choice Panels -->
+            <div class="glass-panel" id="inputPanel">
+                <h2>Audio/Video Input</h2>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabLocal">Local File</button>
+                    <button class="tab-btn" id="tabYoutube">YouTube URL</button>
                 </div>
+
+                <div class="input-panel">
+                    <!-- Local file dropzone -->
+                    <div class="dropzone" id="dropzone">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        <div class="dropzone-text">
+                            <h3>Drag & drop audio or video file here</h3>
+                            <p>Supports MP3, WAV, FLAC, M4A, OGG, MP4, MKV, MOV, AVI</p>
+                        </div>
+                        <input type="file" id="audioFile" accept="audio/*,video/*" style="display: none;">
+                    </div>
+
+                    <!-- YouTube Link container -->
+                    <div class="youtube-input-container" id="youtubeContainer">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        <div style="width: 100%;">
+                            <label for="ytUrl">YouTube Video URL</label>
+                            <input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=...">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="file-info" id="fileInfo">
                     <span id="fileName">No file selected</span>
                     <button class="btn-remove-file" id="btnRemoveFile">&times;</button>
@@ -536,6 +641,11 @@
                     </div>
                     <div class="progress-bar-container">
                         <div class="progress-bar" id="progressBar"></div>
+                    </div>
+                    <!-- Time/ETA Statistics -->
+                    <div class="time-stats" id="timeStatsPanel" style="display: none;">
+                        <span id="elapsedTimeLabel">Elapsed: --</span>
+                        <span id="etaTimeLabel">ETA: --</span>
                     </div>
                 </div>
 
@@ -567,18 +677,31 @@
     <script>
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
+        const gpuInfo = document.getElementById('gpuInfo');
         const modelSizeSelect = document.getElementById('modelSize');
         const instrumentsList = document.getElementById('instrumentsList');
         const btnTranscribe = document.getElementById('btnTranscribe');
+        
+        const tabLocal = document.getElementById('tabLocal');
+        const tabYoutube = document.getElementById('tabYoutube');
         const dropzone = document.getElementById('dropzone');
+        const youtubeContainer = document.getElementById('youtubeContainer');
+        const ytUrlInput = document.getElementById('ytUrl');
+
         const audioFileInput = document.getElementById('audioFile');
         const fileInfo = document.getElementById('fileInfo');
         const fileName = document.getElementById('fileName');
         const btnRemoveFile = document.getElementById('btnRemoveFile');
+        
         const progressPanel = document.getElementById('progressPanel');
         const progressBar = document.getElementById('progressBar');
         const progressPercent = document.getElementById('progressPercent');
         const transcribeStatus = document.getElementById('transcribeStatus');
+        
+        const timeStatsPanel = document.getElementById('timeStatsPanel');
+        const elapsedTimeLabel = document.getElementById('elapsedTimeLabel');
+        const etaTimeLabel = document.getElementById('etaTimeLabel');
+
         const notesVisualizer = document.getElementById('notesVisualizer');
         const resultPanel = document.getElementById('resultPanel');
         const btnDownloadMidi = document.getElementById('btnDownloadMidi');
@@ -586,18 +709,30 @@
         const audioPlayback = document.getElementById('audioPlayback');
         const audioPlayer = document.getElementById('audioPlayer');
 
+        let inputMode = 'local'; // 'local' or 'youtube'
         let selectedFile = null;
         let selectedInstruments = new Set();
         let generatedMidiBase64 = null;
         let generatedMidiBytes = null;
 
-        // Check backend server status and load instruments on load
+        // Timing variables for ETA
+        let startTime = null;
+        let timeInterval = null;
+
+        // Check backend server status, GPU info and load instruments on load
         async function checkServer() {
             try {
                 const response = await fetch('/health');
                 if (response.ok) {
+                    const data = await response.json();
                     statusDot.className = 'status-dot online';
                     statusText.textContent = 'Server Online';
+                    
+                    if (data.gpu) {
+                        gpuInfo.textContent = `GPU: ${data.gpu}`;
+                    } else {
+                        gpuInfo.textContent = 'GPU: None (CPU)';
+                    }
                     loadInstruments();
                 } else {
                     throw new Error('Not OK');
@@ -605,6 +740,7 @@
             } catch (e) {
                 statusDot.className = 'status-dot';
                 statusText.textContent = 'Server Offline';
+                gpuInfo.textContent = 'GPU: Disconnected';
                 console.error("Server health check failed:", e);
             }
         }
@@ -641,6 +777,36 @@
         // Poll server status every 10 seconds
         setInterval(checkServer, 10000);
 
+        // Tab Switching
+        tabLocal.addEventListener('click', () => {
+            inputMode = 'local';
+            tabLocal.classList.add('active');
+            tabYoutube.classList.remove('active');
+            dropzone.style.display = 'flex';
+            youtubeContainer.style.display = 'none';
+            checkInputs();
+        });
+
+        tabYoutube.addEventListener('click', () => {
+            inputMode = 'youtube';
+            tabYoutube.classList.add('active');
+            tabLocal.classList.remove('active');
+            youtubeContainer.style.display = 'flex';
+            dropzone.style.display = 'none';
+            checkInputs();
+        });
+
+        ytUrlInput.addEventListener('input', checkInputs);
+
+        function checkInputs() {
+            if (inputMode === 'local') {
+                btnTranscribe.disabled = !selectedFile;
+            } else {
+                const url = ytUrlInput.value.trim();
+                btnTranscribe.disabled = !url.startsWith('http://') && !url.startsWith('https://');
+            }
+        }
+
         // Dropzone & File logic
         dropzone.addEventListener('click', () => audioFileInput.click());
         
@@ -672,7 +838,7 @@
             fileName.textContent = file.name;
             fileInfo.style.display = 'flex';
             dropzone.style.display = 'none';
-            btnTranscribe.disabled = false;
+            checkInputs();
         }
 
         btnRemoveFile.addEventListener('click', () => {
@@ -680,7 +846,7 @@
             audioFileInput.value = '';
             fileInfo.style.display = 'none';
             dropzone.style.display = 'flex';
-            btnTranscribe.disabled = true;
+            checkInputs();
         });
 
         // Add Log to visualizer panel
@@ -690,56 +856,88 @@
             log.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
             notesVisualizer.appendChild(log);
             
-            // Limit log count to 100 elements to avoid slowing down rendering
-            if (notesVisualizer.children.length > 100) {
+            // Auto scroll to bottom
+            notesVisualizer.scrollTop = notesVisualizer.scrollHeight;
+            
+            // Limit log count to 150 elements to avoid slowing down rendering
+            if (notesVisualizer.children.length > 150) {
                 notesVisualizer.removeChild(notesVisualizer.firstChild);
             }
         }
 
+        function formatTime(seconds) {
+            if (seconds === Infinity || isNaN(seconds) || seconds < 0) return "--";
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}m ${s}s`;
+        }
+
+        function updateElapsedStats() {
+            if (!startTime) return;
+            const elapsed = (Date.now() - startTime) / 1000;
+            elapsedTimeLabel.textContent = `Elapsed: ${formatTime(elapsed)}`;
+        }
+
         // Action: Transcribe
         btnTranscribe.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
             // Reset UI
             progressPanel.style.display = 'flex';
             resultPanel.style.display = 'none';
             audioPlayback.style.display = 'none';
             progressBar.style.width = '0%';
             progressPercent.textContent = '0%';
-            transcribeStatus.textContent = 'Starting server run...';
+            transcribeStatus.textContent = 'Starting processing run...';
             notesVisualizer.innerHTML = '';
             btnTranscribe.disabled = true;
             btnRemoveFile.disabled = true;
+            ytUrlInput.disabled = true;
             generatedMidiBase64 = null;
             generatedMidiBytes = null;
 
-            addLog("Uploading audio file and initializing model...", "system");
+            // Timer setup
+            startTime = Date.now();
+            timeStatsPanel.style.display = 'flex';
+            elapsedTimeLabel.textContent = "Elapsed: 0s";
+            etaTimeLabel.textContent = "ETA: Calculating...";
+            clearInterval(timeInterval);
+            timeInterval = setInterval(updateElapsedStats, 1000);
 
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            
-            // Append selected instruments
-            selectedInstruments.forEach(inst => {
-                formData.append('instruments', inst);
-            });
-
-            // Note: Our server_gui.py loads the specified model size on startup.
-            // If the user wants to run a different model, they restart the server with that model.
-            // Here, we just log the request configuration.
-            addLog(`Requesting transcription (Model loaded on server: ${modelSizeSelect.value})`, "system");
-
+            let response;
             try {
-                const response = await fetch('/transcribe', {
-                    method: 'POST',
-                    body: formData
-                });
+                if (inputMode === 'local') {
+                    addLog("Uploading local file and initializing model...", "system");
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    selectedInstruments.forEach(inst => {
+                        formData.append('instruments', inst);
+                    });
+
+                    response = await fetch('/transcribe', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    const ytUrl = ytUrlInput.value.trim();
+                    addLog(`Requesting YouTube download and transcription for: ${ytUrl}`, "system");
+                    
+                    const formData = new FormData();
+                    formData.append('url', ytUrl);
+                    selectedInstruments.forEach(inst => {
+                        formData.append('instruments', inst);
+                    });
+
+                    response = await fetch('/transcribe_youtube', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
 
                 if (!response.ok) {
                     const errText = await response.text();
                     throw new Error(errText || `Server responded with status ${response.status}`);
                 }
 
-                transcribeStatus.textContent = 'Transcribing...';
+                transcribeStatus.textContent = 'Processing...';
                 
                 // Read the Stream
                 const reader = response.body.getReader();
@@ -770,9 +968,12 @@
                 console.error("Transcription failed:", e);
                 transcribeStatus.textContent = 'Failed';
                 addLog(`Error: ${e.message}`, "note-on");
+                clearInterval(timeInterval);
             } finally {
                 btnTranscribe.disabled = false;
                 btnRemoveFile.disabled = false;
+                ytUrlInput.disabled = false;
+                checkInputs();
             }
         });
 
@@ -783,14 +984,33 @@
                 progressBar.style.width = `${percent}%`;
                 progressPercent.textContent = `${percent}%`;
                 transcribeStatus.textContent = `Processing chunk ${event.completed} of ${event.total}`;
+
+                // Calculate ETA
+                if (startTime && event.completed > 0) {
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const rate = event.completed / event.total;
+                    const totalEstimated = elapsed / rate;
+                    const remaining = totalEstimated - elapsed;
+                    etaTimeLabel.textContent = `ETA: ${formatTime(remaining)}`;
+                }
             } 
             else if (event.type === 'start') {
-                addLog(`NOTE ON: Pitch ${event.pitch}, Velocity ${event.velocity}, Instrument: ${event.program}`, "note-on");
+                const instrName = event.program !== undefined ? `Prog ${event.program}` : 'Default';
+                addLog(`NOTE ON: Pitch ${event.pitch}, Velocity ${event.velocity}, Instrument: ${instrName}`, "note-on");
             } 
             else if (event.type === 'end') {
                 addLog(`NOTE OFF: Event index ref ${event.start_event_index} (at ${event.end_time.toFixed(2)}s)`, "note-off");
             } 
+            else if (event.type === 'status_update') {
+                // Custom status reports from YouTube download etc
+                addLog(event.message, "system");
+            }
             else if (event.type === 'midi') {
+                clearInterval(timeInterval);
+                const elapsed = (Date.now() - startTime) / 1000;
+                elapsedTimeLabel.textContent = `Elapsed: ${formatTime(elapsed)}`;
+                etaTimeLabel.textContent = "Finished!";
+                
                 progressBar.style.width = `100%`;
                 progressPercent.textContent = `100%`;
                 transcribeStatus.textContent = `Complete`;
@@ -818,8 +1038,14 @@
             const a = document.createElement('a');
             
             // Clean original filename and append .mid
-            const origName = selectedFile ? selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.')) : 'transcription';
-            a.download = `${origName}.mid`;
+            let outputName = 'transcription';
+            if (inputMode === 'local' && selectedFile) {
+                outputName = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.'));
+            } else if (inputMode === 'youtube') {
+                outputName = 'youtube_transcription';
+            }
+            
+            a.download = `${outputName}.mid`;
             a.href = url;
             a.click();
             

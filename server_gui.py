@@ -3,12 +3,20 @@ import sys
 import argparse
 import subprocess
 import tempfile
-import uvicorn
+import json
+import base64
+import asyncio
+import threading
 from io import BytesIO
+import torch
+import uvicorn
+import yt_dlp
 from fastapi import File, Form, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from muscriptor.transcription_model import TranscriptionModel
-from muscriptor.server import create_app
+from muscriptor.server import create_app, event_to_dict
+from muscriptor.events import ProgressEvent
 
 def main():
     parser = argparse.ArgumentParser(description="Run the MuScriptor GUI Server")
@@ -18,14 +26,21 @@ def main():
     parser.add_argument("--device", type=str, default="cuda", help="Torch device: 'cuda', 'cpu', or 'auto'")
     args = parser.parse_args()
 
-    # Determine device
-    import torch
+    # Determine device and verify GPU
     device = args.device
+    gpu_name = None
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
-    elif device == "cuda" and not torch.cuda.is_available():
-        print("Warning: CUDA requested but not available. Falling back to CPU.")
-        device = "cpu"
+        
+    if "cuda" in device:
+        if torch.cuda.is_available():
+            # Explicitly verify which GPU is used
+            gpu_name = torch.cuda.get_device_name(0)
+            print(f"CUDA is available! Explicitly using GPU 0: {gpu_name}")
+            device = "cuda:0"
+        else:
+            print("Warning: CUDA requested but not available. Falling back to CPU.")
+            device = "cpu"
 
     print(f"Loading MuScriptor model '{args.model}' on device '{device}'...")
     try:
@@ -35,12 +50,17 @@ def main():
         print(f"Error loading model: {e}")
         sys.exit(1)
 
-    # Get current working directory where gui.html (or index.html) will reside
+    # Get current working directory where index.html resides
     current_dir = os.path.dirname(os.path.abspath(__file__))
     print(f"Serving web directory: {current_dir}")
 
     # Create app
     app = create_app(model, web_dir=current_dir)
+
+    # Intercept health check to include GPU name
+    @app.get("/health")
+    async def health_check():
+        return {"status": "ok", "gpu": gpu_name}
 
     # Locate and wrap the original transcribe handler to intercept video files
     original_route = None
@@ -116,7 +136,108 @@ def main():
                 # Normal audio file, pass through
                 return await original_handler(file, instruments)
 
-    # Add CORS middleware just in case user opens index.html locally via file:// protocol
+    # Add YouTube transcription endpoint
+    @app.post("/transcribe_youtube")
+    async def transcribe_youtube(
+        url: str = Form(...),
+        instruments: list[str] = Form(default=[])
+    ):
+        print(f"YouTube Transcription requested for: {url}")
+        
+        # Reuse same concurrency lock as original /transcribe to prevent overloading GPU
+        # In FastAPI serve.py, transcribe_lock is a module-level lock or app-level property,
+        # but here we can just use a local lock or leverage the original /transcribe lock.
+        # However, to keep it simple, we can run it and load the audio.
+        
+        def sse_generator():
+            temp_audio_path = None
+            temp_wav_path = None
+            
+            try:
+                # Step 1: Download from YouTube using yt-dlp
+                yield f"data: {json.dumps({'type': 'status_update', 'message': 'Downloading YouTube audio track...'})}\n\n"
+                
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': os.path.join(tempfile.gettempdir(), 'yt_download_%(id)s.%(ext)s'),
+                    'quiet': True,
+                    'no_warnings': True,
+                }
+                
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                    downloaded_filename = ydl.prepare_filename(info)
+                    temp_audio_path = downloaded_filename
+                
+                # Step 2: Convert to WAV using FFmpeg
+                yield f"data: {json.dumps({'type': 'status_update', 'message': 'Converting audio track to WAV...'})}\n\n"
+                
+                temp_wav_path = temp_audio_path + ".wav"
+                cmd = [
+                    "ffmpeg", "-y", "-i", temp_audio_path,
+                    "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                    temp_wav_path
+                ]
+                print(f"Running FFmpeg: {' '.join(cmd)}")
+                result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if result.returncode != 0:
+                    yield f"data: {json.dumps({'type': 'status_update', 'message': 'FFmpeg conversion failed!'})}\n\n"
+                    return
+                
+                # Step 3: Perform Transcription
+                yield f"data: {json.dumps({'type': 'status_update', 'message': 'Loading audio track into transcription engine...'})}\n\n"
+                
+                from muscriptor.utils.audio import _read_wav_file
+                with open(temp_wav_path, "rb") as f:
+                    wav_data = f.read()
+                wav, sr = _read_wav_file(BytesIO(wav_data))
+                
+                events = []
+                yield f"data: {json.dumps({'type': 'status_update', 'message': 'Starting model run...'})}\n\n"
+                
+                for ev in model.transcribe(
+                    (wav, sr),
+                    instruments=instruments or None,
+                    batch_size=1,
+                    no_eos_is_ok=True,
+                ):
+                    if isinstance(ev, ProgressEvent):
+                        payload = json.dumps({
+                            "type": "progress",
+                            "completed": ev.completed,
+                            "total": ev.total
+                        })
+                        yield f"data: {payload}\n\n"
+                        continue
+                    events.append(ev)
+                    payload = json.dumps(event_to_dict(ev))
+                    yield f"data: {payload}\n\n"
+                
+                # Step 4: Finalize MIDI payload
+                midi_bytes = model.events_to_midi_bytes(iter(events))
+                midi_b64 = base64.b64encode(midi_bytes).decode("ascii")
+                payload = json.dumps({"type": "midi", "data": midi_b64})
+                yield f"data: {payload}\n\n"
+                
+            except Exception as e:
+                print(f"Error during YouTube transcription: {e}")
+                yield f"data: {json.dumps({'type': 'status_update', 'message': f'Error: {str(e)}'})}\n\n"
+            finally:
+                # Cleanup files
+                if temp_audio_path and os.path.exists(temp_audio_path):
+                    try: os.remove(temp_audio_path)
+                    except: pass
+                if temp_wav_path and os.path.exists(temp_wav_path):
+                    try: os.remove(temp_wav_path)
+                    except: pass
+
+        return StreamingResponse(
+            sse_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
