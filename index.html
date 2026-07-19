@@ -1307,7 +1307,7 @@
                     for (const note of pianoRollNotes) {
                         if (selectedNotes.has(note.index)) {
                             note.pitch = Math.min(127, note.pitch + 1);
-                            playSynthNote(note.pitch, 0.25);
+                            playSynthNote(note.pitch, 0.25, note.instrument);
                         }
                     }
                     rebuildNotesIndex();
@@ -1321,7 +1321,7 @@
                     for (const note of pianoRollNotes) {
                         if (selectedNotes.has(note.index)) {
                             note.pitch = Math.max(0, note.pitch - 1);
-                            playSynthNote(note.pitch, 0.25);
+                            playSynthNote(note.pitch, 0.25, note.instrument);
                         }
                     }
                     rebuildNotesIndex();
@@ -1381,7 +1381,7 @@
         const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
         // Play Synth Tone via AudioContext
-        function playSynthNote(pitch, duration = 0.5) {
+        function playSynthNote(pitch, duration = 0.5, instrumentName = 'piano') {
             try {
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1390,22 +1390,106 @@
                     audioCtx.resume();
                 }
                 
-                const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+                const inst = (instrumentName || '').toLowerCase();
                 
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                
-                osc.type = 'triangle'; // Clean round sound
-                osc.frequency.value = freq;
-                
-                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-                
-                osc.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                osc.start();
-                osc.stop(audioCtx.currentTime + duration);
+                // 1. Drum / Percussion synthesis
+                if (inst.includes('drum') || inst.includes('perc') || inst.includes('rit') || inst.includes('beat')) {
+                    // Snare/Hat noise burst
+                    const noiseBufSize = audioCtx.sampleRate * Math.min(0.2, duration);
+                    const noiseBuffer = audioCtx.createBuffer(1, noiseBufSize, audioCtx.sampleRate);
+                    const noiseData = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < noiseBufSize; i++) {
+                        noiseData[i] = Math.random() * 2 - 1;
+                    }
+                    const noiseSource = audioCtx.createBufferSource();
+                    noiseSource.buffer = noiseBuffer;
+                    
+                    const noiseFilter = audioCtx.createBiquadFilter();
+                    noiseFilter.type = pitch < 45 ? 'lowpass' : (pitch > 60 ? 'highpass' : 'bandpass');
+                    noiseFilter.frequency.value = pitch < 45 ? 200 : (pitch > 60 ? 6000 : 1200);
+                    
+                    const noiseGain = audioCtx.createGain();
+                    noiseGain.gain.setValueAtTime(0.08 * volSynth, audioCtx.currentTime);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + Math.min(0.15, duration));
+                    
+                    noiseSource.connect(noiseFilter);
+                    noiseFilter.connect(noiseGain);
+                    noiseGain.connect(audioCtx.destination);
+                    noiseSource.start();
+                    noiseSource.stop(audioCtx.currentTime + Math.min(0.18, duration));
+                    
+                    // Kick thud
+                    const kickOsc = audioCtx.createOscillator();
+                    const kickGain = audioCtx.createGain();
+                    kickOsc.frequency.setValueAtTime(pitch < 45 ? 130 : 90, audioCtx.currentTime);
+                    kickOsc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.08);
+                    
+                    kickGain.gain.setValueAtTime(0.16 * volSynth, audioCtx.currentTime);
+                    kickGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
+                    
+                    kickOsc.connect(kickGain);
+                    kickGain.connect(audioCtx.destination);
+                    kickOsc.start();
+                    kickOsc.stop(audioCtx.currentTime + 0.15);
+                } 
+                // 2. Bass synthesis
+                else if (inst.includes('bass')) {
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    const filter = audioCtx.createBiquadFilter();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = 440 * Math.pow(2, (pitch - 69) / 12);
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(250, audioCtx.currentTime);
+                    
+                    gainNode.gain.setValueAtTime(0.18 * volSynth, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                    
+                    osc.connect(filter);
+                    filter.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + duration);
+                }
+                // 3. Guitar / Plucked string synthesis
+                else if (inst.includes('guitar')) {
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    osc.type = 'triangle';
+                    osc.frequency.value = 440 * Math.pow(2, (pitch - 69) / 12);
+                    
+                    gainNode.gain.setValueAtTime(0.15 * volSynth, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration * 0.8);
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + duration);
+                }
+                // 4. Default Keyboard / Piano synthesis
+                else {
+                    const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+                    
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    osc.type = 'triangle'; // Clean round sound
+                    osc.frequency.value = freq;
+                    
+                    gainNode.gain.setValueAtTime(0.12 * volSynth, audioCtx.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + duration);
+                }
 
                 // Highlight key
                 activeSynthPitch = pitch;
@@ -2492,7 +2576,7 @@
             if (mouseX <= PR_LEFT && mouseY > PR_TOP) {
                 const pitch = yToPitch(mouseY);
                 if (pitch >= 0 && pitch <= 127) {
-                    playSynthNote(pitch);
+                    playSynthNote(pitch, 0.5, selectActiveInstrument.value);
                 }
                 return;
             }
@@ -2540,7 +2624,7 @@
                         instrument: instName,
                         index: manualNoteIdCounter++
                     };
-                    playSynthNote(pitch, 0.25);
+                    playSynthNote(pitch, 0.25, instName);
                     queuePianoRollRender();
                     return;
                 }
@@ -2583,7 +2667,7 @@
                                 }));
                         }
                         
-                        playSynthNote(note.pitch, 0.15);
+                        playSynthNote(note.pitch, 0.15, note.instrument);
                         queuePianoRollRender();
                     } else {
                         if (e.shiftKey) {
@@ -2808,17 +2892,21 @@
             originalAudioPlayer.playbackRate = playbackSpeedRate;
             originalAudioPlayer.defaultPlaybackRate = playbackSpeedRate;
 
-            playbackTime = prViewStart; // Play from current view start
-            
             // Limit start time to song length
             let maxTime = 0;
             for (const n of pianoRollNotes) {
                 const t = n.endTime || n.startTime;
                 if (t > maxTime) maxTime = t;
             }
+
+            // Start playing from current playhead position if it's visible, otherwise start from view start.
+            // If it's past the end of the song, reset to 0.
+            const prViewEnd = prViewStart + (pianoRollCanvas.width - PR_LEFT) / pixelsPerSecond;
             if (playbackTime >= maxTime) {
                 playbackTime = 0;
                 prViewStart = 0;
+            } else if (playbackTime < prViewStart || playbackTime > prViewEnd) {
+                playbackTime = prViewStart;
             }
 
             if (originalAudioLoaded && originalAudioPlayer.src) {
@@ -2875,7 +2963,7 @@
                             const duration = note.endTime ? (note.endTime - note.startTime) : 0.5;
                             // Scale duration by playback speed rate
                             const playDuration = Math.max(0.1, duration) / playbackSpeedRate;
-                            playSynthNote(note.pitch, playDuration);
+                            playSynthNote(note.pitch, playDuration, note.instrument);
                         }
                         noteIndex++;
                     }
