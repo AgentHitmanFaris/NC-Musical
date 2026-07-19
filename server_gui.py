@@ -137,6 +137,18 @@ def main():
                 # Normal audio file, pass through
                 return await original_handler(file, instruments)
 
+        def move_route_before_static_mount(app_obj):
+            web_idx = len(app_obj.router.routes) - 1
+            for i, r in enumerate(app_obj.router.routes):
+                if getattr(r, "name", None) == "web" or r.path == "/":
+                    web_idx = i
+                    break
+            if web_idx < len(app_obj.router.routes) - 1:
+                new_r = app_obj.router.routes.pop()
+                app_obj.router.routes.insert(web_idx, new_r)
+
+        move_route_before_static_mount(app)
+
     # Add YouTube transcription endpoint
     @app.post("/transcribe_youtube")
     async def transcribe_youtube(
@@ -237,6 +249,9 @@ def main():
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    if original_route:
+        move_route_before_static_mount(app)
 
     # Add CORS middleware
     app.add_middleware(
