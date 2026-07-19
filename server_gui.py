@@ -1,5 +1,23 @@
 import os
 import sys
+import shutil
+
+# Configure local D-drive path for HuggingFace home
+project_dir = os.path.dirname(os.path.abspath(__file__))
+local_hf_home = os.path.join(project_dir, ".cache", "huggingface")
+
+# If old cache exists and local cache does not, copy it to avoid redownloads and keep credentials
+old_hf_home = os.path.expanduser("~/.cache/huggingface")
+if os.path.exists(old_hf_home) and not os.path.exists(local_hf_home):
+    print(f"Migrating HuggingFace cache from C-drive ({old_hf_home}) to D-drive ({local_hf_home}) to save C-drive space...")
+    try:
+        os.makedirs(os.path.dirname(local_hf_home), exist_ok=True)
+        shutil.copytree(old_hf_home, local_hf_home)
+        print("Migration complete!")
+    except Exception as e:
+        print(f"Warning: Failed to auto-migrate cache: {e}")
+
+os.environ["HF_HOME"] = local_hf_home
 import argparse
 import subprocess
 import tempfile
