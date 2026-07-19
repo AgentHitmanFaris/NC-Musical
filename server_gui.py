@@ -209,6 +209,16 @@ def main():
     # Create app
     app = create_app(model, web_dir=current_dir)
 
+    def move_route_before_static_mount(app_obj):
+        web_idx = len(app_obj.router.routes) - 1
+        for i, r in enumerate(app_obj.router.routes):
+            if getattr(r, "name", None) == "web" or r.path == "/":
+                web_idx = i
+                break
+        if web_idx < len(app_obj.router.routes) - 1:
+            new_r = app_obj.router.routes.pop()
+            app_obj.router.routes.insert(web_idx, new_r)
+
     # Locate and wrap the original health handler to return GPU name
     original_health_route = None
     for route in app.router.routes:
@@ -223,6 +233,7 @@ def main():
     @app.get("/health")
     async def health_check():
         return {"status": "ok", "gpu": gpu_name}
+    move_route_before_static_mount(app)
 
     from fastapi.responses import FileResponse
     @app.get("/audio")
@@ -231,6 +242,7 @@ def main():
         if os.path.exists(latest_audio_path):
             return FileResponse(latest_audio_path, media_type="audio/wav")
         raise HTTPException(status_code=404, detail="No audio file transcribed yet")
+    move_route_before_static_mount(app)
 
     # Locate and wrap the original transcribe handler to intercept video files
     original_route = None
@@ -320,16 +332,6 @@ def main():
                 background=BackgroundTask(release_once),
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
-
-        def move_route_before_static_mount(app_obj):
-            web_idx = len(app_obj.router.routes) - 1
-            for i, r in enumerate(app_obj.router.routes):
-                if getattr(r, "name", None) == "web" or r.path == "/":
-                    web_idx = i
-                    break
-            if web_idx < len(app_obj.router.routes) - 1:
-                new_r = app_obj.router.routes.pop()
-                app_obj.router.routes.insert(web_idx, new_r)
 
         move_route_before_static_mount(app)
 
