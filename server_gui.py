@@ -54,6 +54,31 @@ def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     print(f"Serving web directory: {current_dir}")
 
+    # Find FFmpeg path dynamically
+    def find_ffmpeg():
+        import shutil
+        import glob
+        ffmpeg_path = shutil.which("ffmpeg")
+        if ffmpeg_path:
+            return ffmpeg_path
+
+        # Check in winget directory under AppData\Local
+        appdata_local = os.environ.get("LOCALAPPDATA", "")
+        if appdata_local:
+            winget_pattern = os.path.join(appdata_local, "Microsoft", "WinGet", "Packages", "**", "ffmpeg.exe")
+            winget_matches = glob.glob(winget_pattern, recursive=True)
+            if winget_matches:
+                print(f"Discovered FFmpeg from WinGet: {winget_matches[0]}")
+                return winget_matches[0]
+
+        # Check in current working directory
+        if os.path.exists("ffmpeg.exe"):
+            return os.path.abspath("ffmpeg.exe")
+
+        return "ffmpeg"
+
+    ffmpeg_executable = find_ffmpeg()
+
     # Create app
     app = create_app(model, web_dir=current_dir)
 
@@ -86,8 +111,12 @@ def main():
             if ext in video_exts:
                 print(f"Video file detected: {filename}. Extracting audio track...")
                 
+                # Use local temp folder inside the current directory
+                temp_dir = os.path.join(current_dir, ".temp")
+                os.makedirs(temp_dir, exist_ok=True)
+                
                 # Save uploaded video to temporary file
-                with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as temp_video:
+                with tempfile.NamedTemporaryFile(suffix=ext, dir=temp_dir, delete=False) as temp_video:
                     temp_video.write(await file.read())
                     temp_video_path = temp_video.name
 
@@ -96,7 +125,7 @@ def main():
                 try:
                     # Run FFmpeg to extract audio as 16kHz mono WAV
                     cmd = [
-                        "ffmpeg", "-y", "-i", temp_video_path,
+                        ffmpeg_executable, "-y", "-i", temp_video_path,
                         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
                         temp_wav_path
                     ]
@@ -167,12 +196,16 @@ def main():
             temp_wav_path = None
             
             try:
+                # Use local temp folder inside the current directory
+                temp_dir = os.path.join(current_dir, ".temp")
+                os.makedirs(temp_dir, exist_ok=True)
+
                 # Step 1: Download from YouTube using yt-dlp
                 yield f"data: {json.dumps({'type': 'status_update', 'message': 'Downloading YouTube audio track...'})}\n\n"
                 
                 ydl_opts = {
                     'format': 'bestaudio/best',
-                    'outtmpl': os.path.join(tempfile.gettempdir(), 'yt_download_%(id)s.%(ext)s'),
+                    'outtmpl': os.path.join(temp_dir, 'yt_download_%(id)s.%(ext)s'),
                     'quiet': True,
                     'no_warnings': True,
                 }
@@ -187,7 +220,7 @@ def main():
                 
                 temp_wav_path = temp_audio_path + ".wav"
                 cmd = [
-                    "ffmpeg", "-y", "-i", temp_audio_path,
+                    ffmpeg_executable, "-y", "-i", temp_audio_path,
                     "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
                     temp_wav_path
                 ]
