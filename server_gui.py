@@ -109,8 +109,20 @@ def main():
                 model_state["model_size"] = requested_size
                 print(f"Successfully loaded model '{requested_size}'!")
             except Exception as e:
-                print(f"Error loading model '{requested_size}': {e}")
-                raise e
+                err_msg = str(e)
+                if "gated" in err_msg.lower() or "403" in err_msg or "authorized" in err_msg.lower() or "restricted" in err_msg.lower():
+                    friendly_err = (
+                        f"Access to the '{requested_size}' model is restricted on HuggingFace. "
+                        f"Please visit https://huggingface.co/MuScriptor/muscriptor-{requested_size} "
+                        f"in your browser, log in, and click 'Accept/Request Access' to authorize your HuggingFace account."
+                    )
+                    print("\n" + "!" * 85)
+                    print(friendly_err)
+                    print("!" * 85 + "\n")
+                    raise RuntimeError(friendly_err) from e
+                else:
+                    print(f"Error loading model '{requested_size}': {e}")
+                    raise e
 
     def make_release_once(lock):
         released = False
