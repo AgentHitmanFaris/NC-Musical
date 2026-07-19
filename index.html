@@ -33,32 +33,44 @@
 
         body {
             background-color: var(--bg-base);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%),
-                radial-gradient(at 50% 50%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
-            background-attachment: fixed;
             color: var(--text-main);
             font-family: var(--font-main);
-            min-height: 100vh;
+            height: 100vh;
+            width: 100vw;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
+            flex-direction: row;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
         }
 
-        header {
-            width: 100%;
-            max-width: 1200px;
-            padding: 2.5rem 1.5rem 1rem 1.5rem;
+        .sidebar {
+            width: 360px;
+            min-width: 360px;
+            height: 100vh;
+            background: rgba(10, 11, 16, 0.96);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1.25rem;
+            overflow-y: auto;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .logo {
             font-weight: 700;
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             background: linear-gradient(135deg, var(--text-main) 30%, var(--primary) 70%, var(--secondary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -68,9 +80,9 @@
         }
 
         .logo span.badge {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 500;
-            padding: 0.2rem 0.5rem;
+            padding: 0.15rem 0.45rem;
             border-radius: 99px;
             background: rgba(99, 102, 241, 0.15);
             border: 1px solid var(--primary);
@@ -80,34 +92,31 @@
 
         .server-status {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.25rem;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .status-badge {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
+            gap: 0.4rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
             background: var(--bg-surface);
-            padding: 0.5rem 1rem;
+            padding: 0.35rem 0.75rem;
             border-radius: 99px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
         }
 
         .gpu-badge {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: var(--accent);
             font-weight: 500;
-            margin-right: 0.5rem;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
             border-radius: 50%;
             background-color: #ef4444;
             box-shadow: 0 0 8px #ef4444;
@@ -118,31 +127,22 @@
             box-shadow: 0 0 8px #10b981;
         }
 
-        main {
-            width: 100%;
-            max-width: 1200px;
-            padding: 1.5rem;
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 2rem;
-            flex-grow: 1;
-        }
-
-        @media (min-width: 1024px) {
-            main {
-                grid-template-columns: 380px 1fr;
-            }
+        .workspace {
+            flex: 1;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: #07080c;
         }
 
         .glass-panel {
             background: var(--bg-surface);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             border: 1px solid var(--border-glow);
-            border-radius: 1.25rem;
-            padding: 1.8rem;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 0.75rem;
+            padding: 1.2rem;
+            box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.2);
+            transition: border-color 0.3s ease;
         }
 
         .glass-panel:hover {
@@ -150,35 +150,35 @@
         }
 
         h2 {
-            font-size: 1.4rem;
+            font-size: 1.1rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.75rem;
             color: var(--text-main);
-            border-left: 4px solid var(--primary);
-            padding-left: 0.75rem;
+            border-left: 3px solid var(--primary);
+            padding-left: 0.5rem;
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.75rem;
         }
 
         label {
             display: block;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 500;
             color: var(--text-muted);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
 
         select, input[type="text"] {
             width: 100%;
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 0.5rem;
+            border-radius: 0.35rem;
             color: var(--text-main);
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 0.75rem;
             font-family: var(--font-main);
-            font-size: 1rem;
+            font-size: 0.88rem;
             outline: none;
             transition: border-color 0.2s ease;
         }
@@ -190,11 +190,11 @@
         /* Tabs styling */
         .tabs {
             display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
+            gap: 0.25rem;
+            margin-bottom: 0.75rem;
             background: rgba(255, 255, 255, 0.03);
-            padding: 0.3rem;
-            border-radius: 0.75rem;
+            padding: 0.2rem;
+            border-radius: 0.5rem;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
@@ -203,30 +203,26 @@
             background: transparent;
             border: none;
             color: var(--text-muted);
-            padding: 0.6rem;
-            border-radius: 0.5rem;
+            padding: 0.4rem;
+            border-radius: 0.35rem;
             cursor: pointer;
             font-family: var(--font-main);
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             transition: all 0.2s ease;
         }
 
         .tab-btn.active {
             background: var(--primary);
             color: white;
-            box-shadow: 0 4px 12px var(--primary-glow);
+            box-shadow: 0 2px 8px var(--primary-glow);
         }
 
         /* Dropzone & Input Panel Styling */
-        .input-panel {
-            min-height: 250px;
-        }
-
         .dropzone {
             border: 2px dashed rgba(255, 255, 255, 0.1);
-            border-radius: 1rem;
-            padding: 3rem 1.5rem;
+            border-radius: 0.75rem;
+            padding: 1.5rem 1rem;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -235,35 +231,33 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 1rem;
-            min-height: 250px;
+            gap: 0.5rem;
+            min-height: 120px;
         }
 
         .dropzone:hover, .dropzone.dragover {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.05);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
         }
 
         .dropzone svg {
-            width: 48px;
-            height: 48px;
+            width: 32px;
+            height: 32px;
             color: var(--primary);
             transition: transform 0.3s ease;
         }
 
         .dropzone:hover svg {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
         }
 
         .dropzone-text h3 {
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             font-weight: 500;
-            margin-bottom: 0.25rem;
         }
 
         .dropzone-text p {
-            font-size: 0.85rem;
+            font-size: 0.72rem;
             color: var(--text-muted);
         }
 
@@ -272,17 +266,17 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 1.2rem;
+            gap: 0.75rem;
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 1rem;
-            padding: 3rem 2rem;
-            min-height: 250px;
+            border-radius: 0.75rem;
+            padding: 1.5rem 1rem;
+            min-height: 120px;
         }
 
         .youtube-input-container svg {
-            width: 48px;
-            height: 48px;
+            width: 36px;
+            height: 36px;
             color: #ef4444;
         }
 
@@ -291,15 +285,15 @@
             width: 100%;
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 0.5rem;
-            padding: 0.75rem 1rem;
-            margin-top: 1rem;
+            border-radius: 0.35rem;
+            padding: 0.5rem 0.75rem;
+            margin-top: 0.5rem;
             align-items: center;
             justify-content: space-between;
         }
 
         .file-info span {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             font-weight: 500;
             white-space: nowrap;
             overflow: hidden;
@@ -313,8 +307,8 @@
             color: #ef4444;
             cursor: pointer;
             font-weight: 700;
-            font-size: 1rem;
-            padding: 0.25rem;
+            font-size: 0.9rem;
+            padding: 0.15rem;
         }
 
         .btn-action {
@@ -322,23 +316,23 @@
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
             border: none;
-            border-radius: 0.5rem;
-            padding: 0.85rem 1.5rem;
+            border-radius: 0.35rem;
+            padding: 0.65rem 1rem;
             font-family: var(--font-main);
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px var(--primary-glow);
+            box-shadow: 0 2px 10px var(--primary-glow);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.35rem;
         }
 
         .btn-action:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.5);
         }
 
         .btn-action:disabled {
@@ -348,22 +342,15 @@
             box-shadow: none;
         }
 
-        /* Transcription progress & result panels */
-        .main-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
         .status-container {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.5rem;
         }
 
         .progress-bar-container {
             width: 100%;
-            height: 12px;
+            height: 8px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 99px;
             overflow: hidden;
@@ -395,45 +382,44 @@
         .progress-stats {
             display: flex;
             justify-content: space-between;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
         }
 
         .time-stats {
             display: flex;
             justify-content: space-between;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--accent);
             font-family: var(--font-mono);
             background: rgba(6, 182, 212, 0.05);
-            padding: 0.4rem 0.8rem;
-            border-radius: 0.5rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.35rem;
             border: 1px solid rgba(6, 182, 212, 0.15);
         }
 
         /* Event stream/visualization */
         .notes-visualizer {
-            flex-grow: 1;
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 0.75rem;
-            height: 200px;
+            border-radius: 0.5rem;
+            height: 110px;
             overflow-y: auto;
-            padding: 1rem;
+            padding: 0.5rem;
             font-family: var(--font-mono);
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.2rem;
             scroll-behavior: smooth;
         }
 
         .note-log {
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
             background: rgba(255, 255, 255, 0.02);
-            border-left: 3px solid transparent;
-            animation: fade-in 0.3s ease-out;
+            border-left: 2px solid transparent;
+            animation: fade-in 0.2s ease-out;
         }
 
         .note-log.note-on {
@@ -453,26 +439,26 @@
         }
 
         @keyframes fade-in {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(3px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         /* Instruments selector tags */
         .instruments-selector {
-            max-height: 150px;
+            max-height: 100px;
             overflow-y: auto;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 0.5rem;
-            padding: 0.75rem;
+            border-radius: 0.35rem;
+            padding: 0.5rem;
             background: var(--bg-card);
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.35rem;
         }
 
         .instrument-tag {
-            font-size: 0.8rem;
-            padding: 0.25rem 0.6rem;
+            font-size: 0.75rem;
+            padding: 0.15rem 0.45rem;
             border-radius: 99px;
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -485,139 +471,97 @@
             background: rgba(99, 102, 241, 0.2);
             border-color: var(--primary);
             color: white;
-            box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 0 6px rgba(99, 102, 241, 0.2);
         }
 
         .result-panel {
-            display: none;
+            display: flex;
             animation: fade-in 0.5s ease;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .btn-download {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-        }
-
-        .btn-download:hover {
-            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5) !important;
-        }
-
-        .audio-playback {
-            margin-top: 1rem;
-            width: 100%;
-            background: var(--bg-card);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            display: none;
             flex-direction: column;
             gap: 0.75rem;
         }
 
-        audio {
-            width: 100%;
+        .btn-download {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
         }
 
-        /* Tooltips */
+        .btn-download:hover {
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4) !important;
+        }
+
+        .audio-playback {
+            width: 100%;
+            background: var(--bg-card);
+            border-radius: 0.35rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: none;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        audio {
+            width: 100%;
+            height: 32px;
+        }
+
         .tooltip-icon {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.1);
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: bold;
             cursor: help;
-            margin-left: 0.25rem;
+            margin-left: 0.2m;
             color: var(--text-muted);
         }
 
         /* Piano Roll Visualizer */
         .piano-roll-panel {
-            display: none;
+            display: flex;
             flex-direction: column;
             padding: 0;
             overflow: hidden;
-        }
-
-        .piano-roll-panel.active {
-            display: flex;
+            flex: 1;
+            height: 100%;
         }
 
         .piano-roll-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.2rem 1.5rem 0.8rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.01);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            height: 50px;
         }
 
         .piano-roll-header h2 {
             margin-bottom: 0;
+            font-size: 1.1rem;
         }
 
         .piano-roll-controls {
             display: flex;
             gap: 0.35rem;
-            align-items: center;
-        }
-
-        .pr-btn {
-            background: var(--bg-card);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: var(--text-muted);
-            width: 32px;
-            height: 28px;
-            border-radius: 0.35rem;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .pr-btn.wide {
-            width: auto;
-            padding: 0 0.6rem;
-            font-size: 0.75rem;
-            font-family: var(--font-main);
-            font-weight: 500;
-        }
-
-        .pr-btn:hover {
-            border-color: var(--primary);
-            color: var(--text-main);
-            background: rgba(99, 102, 241, 0.1);
-        }
-
-        .pr-btn.active {
-            background: rgba(99, 102, 241, 0.2);
-            border-color: var(--primary);
-            color: var(--primary);
         }
 
         .piano-roll-wrapper {
             position: relative;
             width: 100%;
-            height: 300px;
+            flex: 1;
             cursor: grab;
             overflow: hidden;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background: #08090d;
         }
 
         .piano-roll-wrapper:active {
             cursor: grabbing;
-        }
-
-        .piano-roll-wrapper canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
         }
 
         .track-legend {
@@ -626,8 +570,9 @@
             gap: 0.6rem;
             padding: 0.7rem 1.5rem;
             background: rgba(0, 0, 0, 0.15);
-            min-height: 36px;
+            min-height: 40px;
             align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .track-legend-title {
@@ -675,161 +620,151 @@
             font-family: var(--font-mono);
         }
     </style>
-</head>
-<body>
-
-    <header>
-        <div class="logo">
-            MuScriptor <span class="badge">AMT</span>
-        </div>
-        <div class="server-status">
-            <div class="status-badge">
-                <span id="gpuInfo" class="gpu-badge">GPU: Detecting...</span>
-                <div id="statusDot" class="status-dot"></div>
-                <span id="statusText">Checking...</span>
+</head>    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                MuScriptor <span class="badge">AMT</span>
+            </div>
+            <div class="server-status">
+                <div class="status-badge">
+                    <span id="gpuInfo" class="gpu-badge">GPU: Detecting...</span>
+                    <div id="statusDot" class="status-dot"></div>
+                    <span id="statusText">Checking...</span>
+                </div>
             </div>
         </div>
-    </header>
 
-    <main>
-        <!-- Sidebar Controls -->
-        <section class="glass-panel" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="glass-panel" id="inputPanel" style="padding: 1.2rem; border-radius: 0.75rem;">
+            <h2>Audio/Video Input</h2>
+            
+            <div class="tabs" style="margin-bottom: 1rem; padding: 0.2rem;">
+                <button class="tab-btn active" id="tabLocal" style="padding: 0.4rem; font-size: 0.8rem;">Local File</button>
+                <button class="tab-btn" id="tabYoutube" style="padding: 0.4rem; font-size: 0.8rem;">YouTube URL</button>
+            </div>
+
+            <div class="input-panel" style="min-height: 120px;">
+                <!-- Local file dropzone -->
+                <div class="dropzone" id="dropzone" style="min-height: 120px; padding: 1.5rem 1rem; border-radius: 0.75rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <div class="dropzone-text">
+                        <h3 style="font-size: 0.9rem;">Drag & drop audio or video</h3>
+                        <p style="font-size: 0.72rem;">MP3, WAV, FLAC, MP4, MKV...</p>
+                    </div>
+                    <input type="file" id="audioFile" accept="audio/*,video/*" style="display: none;">
+                </div>
+
+                <!-- YouTube Link container -->
+                <div class="youtube-input-container" id="youtubeContainer" style="min-height: 120px; padding: 1.5rem 1rem; border-radius: 0.75rem; gap: 0.75rem;">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 36px; height: 36px;">
+                        <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <div style="width: 100%;">
+                        <label for="ytUrl" style="font-size: 0.8rem; margin-bottom: 0.25rem;">YouTube Video URL</label>
+                        <input type="text" id="ytUrl" placeholder="https://youtube.com/..." style="padding: 0.5rem 0.75rem; font-size: 0.85rem;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="file-info" id="fileInfo" style="padding: 0.5rem 0.75rem; margin-top: 0.75rem; border-radius: 0.35rem;">
+                <span id="fileName" style="font-size: 0.8rem;">No file selected</span>
+                <button class="btn-remove-file" id="btnRemoveFile" style="font-size: 0.9rem;">&times;</button>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 1.2rem; border-radius: 0.75rem;">
             <h2>Configuration</h2>
             
-            <div class="form-group">
-                <label>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="font-size: 0.8rem; margin-bottom: 0.25rem;">
                     Model Size
                     <span class="tooltip-icon" title="Small (103M): Fast, low VRAM. Medium (307M): Good balance. Large (1.4B): Highest accuracy, transcribes dense instruments, needs more VRAM.">?</span>
                 </label>
-                <select id="modelSize">
-                    <option value="large" selected>Large (1.4B Parameters)</option>
-                    <option value="medium">Medium (307M Parameters)</option>
+                <select id="modelSize" style="padding: 0.5rem 0.75rem; font-size: 0.85rem;">
+                    <option value="large">Large (1.4B Parameters)</option>
+                    <option value="medium" selected>Medium (307M Parameters)</option>
                     <option value="small">Small (103M Parameters)</option>
                 </select>
             </div>
 
-            <div class="form-group">
-                <label>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="font-size: 0.8rem; margin-bottom: 0.25rem;">
                     Target Instruments (Optional)
                     <span class="tooltip-icon" title="Condition the model to transcribe only these instruments. If none are selected, all detected instruments are transcribed.">?</span>
                 </label>
-                <div id="instrumentsList" class="instruments-selector">
-                    <!-- Loaded dynamically -->
-                    <span class="text-muted" style="font-size: 0.85rem;">Loading instruments...</span>
+                <div id="instrumentsList" class="instruments-selector" style="max-height: 100px; padding: 0.5rem; gap: 0.35rem;">
+                    <span class="text-muted" style="font-size: 0.75rem;">Loading instruments...</span>
                 </div>
             </div>
 
-            <div class="form-group" style="margin-top: auto; margin-bottom: 0;">
-                <button id="btnTranscribe" class="btn-action" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                    Start Transcription
+            <button id="btnTranscribe" class="btn-action" disabled style="padding: 0.65rem 1rem; font-size: 0.9rem; border-radius: 0.35rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                Start Transcription
+            </button>
+        </div>
+
+        <!-- Real-time Progress & Visualization -->
+        <div class="glass-panel" id="progressPanel" style="display: none; flex-direction: column; gap: 1rem; padding: 1.2rem; border-radius: 0.75rem;">
+            <h2>Progress Status</h2>
+            
+            <div class="status-container" style="gap: 0.5rem;">
+                <div class="progress-stats" style="font-size: 0.8rem;">
+                    <span id="transcribeStatus">Idle</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-container" style="height: 8px;">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <div class="time-stats" id="timeStatsPanel" style="display: none; font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 0.35rem;">
+                    <span id="elapsedTimeLabel">Elapsed: --</span>
+                    <span id="etaTimeLabel">ETA: --</span>
+                </div>
+            </div>
+
+            <div class="notes-visualizer" id="notesVisualizer" style="height: 110px; font-size: 0.75rem; padding: 0.5rem;">
+                <div class="note-log system">Transcribing output logs...</div>
+            </div>
+
+            <!-- Transcription Result Controls -->
+            <div class="result-panel" id="resultPanel" style="gap: 0.75rem; margin-top: 0.5rem;">
+                <button id="btnDownloadMidi" class="btn-action btn-download" style="padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 0.35rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Download MIDI
                 </button>
-            </div>
-        </section>
-
-        <!-- Main Dashboard -->
-        <section class="main-panel">
-            <!-- Input Choice Panels -->
-            <div class="glass-panel" id="inputPanel">
-                <h2>Audio/Video Input</h2>
                 
-                <div class="tabs">
-                    <button class="tab-btn active" id="tabLocal">Local File</button>
-                    <button class="tab-btn" id="tabYoutube">YouTube URL</button>
-                </div>
+                <button id="btnAuralize" class="btn-action" style="background: var(--bg-card); border: 1px solid var(--primary); padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 0.35rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    Synthesize Playback
+                </button>
 
-                <div class="input-panel">
-                    <!-- Local file dropzone -->
-                    <div class="dropzone" id="dropzone">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                        </svg>
-                        <div class="dropzone-text">
-                            <h3>Drag & drop audio or video file here</h3>
-                            <p>Supports MP3, WAV, FLAC, M4A, OGG, MP4, MKV, MOV, AVI</p>
-                        </div>
-                        <input type="file" id="audioFile" accept="audio/*,video/*" style="display: none;">
-                    </div>
-
-                    <!-- YouTube Link container -->
-                    <div class="youtube-input-container" id="youtubeContainer">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                        <div style="width: 100%;">
-                            <label for="ytUrl">YouTube Video URL</label>
-                            <input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=...">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="file-info" id="fileInfo">
-                    <span id="fileName">No file selected</span>
-                    <button class="btn-remove-file" id="btnRemoveFile">&times;</button>
+                <div class="audio-playback" id="audioPlayback" style="padding: 0.75rem; gap: 0.5rem; margin-top: 0.25rem;">
+                    <label style="font-size: 0.75rem;">Synthesized Audio:</label>
+                    <audio id="audioPlayer" controls style="height: 32px;"></audio>
                 </div>
             </div>
+        </div>
+    </aside>
 
-            <!-- Real-time Progress & Visualization -->
-            <div class="glass-panel" id="progressPanel" style="display: none; flex-direction: column; gap: 1.5rem; flex-grow: 1;">
-                <h2>Transcription Stream</h2>
-                
-                <div class="status-container">
-                    <div class="progress-stats">
-                        <span id="transcribeStatus">Idle</span>
-                        <span id="progressPercent">0%</span>
-                    </div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" id="progressBar"></div>
-                    </div>
-                    <!-- Time/ETA Statistics -->
-                    <div class="time-stats" id="timeStatsPanel" style="display: none;">
-                        <span id="elapsedTimeLabel">Elapsed: --</span>
-                        <span id="etaTimeLabel">ETA: --</span>
-                    </div>
-                </div>
-
-                <div class="notes-visualizer" id="notesVisualizer">
-                    <div class="note-log system">Stream visualization logs will appear here during transcription...</div>
-                </div>
-
-                <!-- Transcription Result Controls -->
-                <div class="result-panel" id="resultPanel">
-                    <button id="btnDownloadMidi" class="btn-action btn-download">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                        Download Transcribed MIDI
-                    </button>
-                    
-                    <button id="btnAuralize" class="btn-action" style="background: var(--bg-card); border: 1px solid var(--primary);">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                        Synthesize Audio (Listen)
-                    </button>
-
-                    <div class="audio-playback" id="audioPlayback">
-                        <label>Synthesized Playback:</label>
-                        <audio id="audioPlayer" controls></audio>
-                    </div>
+    <main class="workspace">
+        <!-- Piano Roll Visualizer Section (Full Width/Height of remaining space) -->
+        <div class="piano-roll-panel" id="pianoRollPanel">
+            <div class="piano-roll-header">
+                <h2>Piano Roll</h2>
+                <div class="piano-roll-controls">
+                    <button class="pr-btn" id="btnPrZoomIn" title="Zoom In">+</button>
+                    <button class="pr-btn" id="btnPrZoomOut" title="Zoom Out">&minus;</button>
+                    <button class="pr-btn wide" id="btnPrFitAll" title="Fit All Notes">Fit</button>
+                    <button class="pr-btn wide active" id="btnPrFollow" title="Auto-follow latest notes">Following</button>
                 </div>
             </div>
-
-            <!-- Piano Roll Visualizer -->
-            <div class="glass-panel piano-roll-panel" id="pianoRollPanel">
-                <div class="piano-roll-header">
-                    <h2>Piano Roll</h2>
-                    <div class="piano-roll-controls">
-                        <button class="pr-btn" id="btnPrZoomIn" title="Zoom In">+</button>
-                        <button class="pr-btn" id="btnPrZoomOut" title="Zoom Out">&minus;</button>
-                        <button class="pr-btn wide" id="btnPrFitAll" title="Fit All Notes">Fit</button>
-                        <button class="pr-btn wide active" id="btnPrFollow" title="Auto-follow latest notes">Following</button>
-                    </div>
-                </div>
-                <div class="piano-roll-wrapper" id="pianoRollWrapper">
-                    <canvas id="pianoRollCanvas"></canvas>
-                </div>
-                <div class="track-legend" id="trackLegend">
-                    <span class="track-legend-title">Detected Tracks</span>
-                </div>
+            <div class="piano-roll-wrapper" id="pianoRollWrapper">
+                <canvas id="pianoRollCanvas"></canvas>
             </div>
-        </section>
+            <div class="track-legend" id="trackLegend">
+                <span class="track-legend-title">Detected Tracks</span>
+            </div>
+        </div>
     </main>
 
     <script>
@@ -904,16 +839,57 @@
         let prDetectedMinPitch = 127;
         let prDetectedMaxPitch = 0;
         let prRenderQueued = false;
+        let activeSynthPitch = null;
+        let audioCtx = null;
 
         const TRACK_COLORS = [
             '#f6c344', '#e84393', '#00cec9', '#fd79a8', '#00b894',
             '#74b9ff', '#6c5ce7', '#a29bfe', '#fab1a0', '#55efc4',
             '#ff7675', '#0984e3', '#e17055', '#81ecec', '#dfe6e9', '#b2bec3'
         ];
-        const PR_LEFT = 52;
+        const PR_LEFT = 50;
         const PR_TOP = 24;
         const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
+
+        // Play Synth Tone via AudioContext
+        function playSynthNote(pitch) {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+                
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                osc.type = 'triangle'; // Clean round sound
+                osc.frequency.value = freq;
+                
+                gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+
+                // Highlight key
+                activeSynthPitch = pitch;
+                queuePianoRollRender();
+                setTimeout(() => {
+                    activeSynthPitch = null;
+                    queuePianoRollRender();
+                }, 150);
+            } catch (e) {
+                console.error("Synth playback failed:", e);
+            }
+        }
 
         // Check backend server status, GPU info and load instruments on load
         async function checkServer() {
@@ -1387,9 +1363,13 @@
             prCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
             const ctx = prCtx;
 
-            // Pitch range with padding
-            const pitchMin = Math.max(0, prDetectedMinPitch - 3);
-            const pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+            // Pitch range: default to C3-C6 (48-84) if no notes yet
+            let pitchMin = 48;
+            let pitchMax = 84;
+            if (pianoRollNotes.length > 0) {
+                pitchMin = Math.max(0, prDetectedMinPitch - 3);
+                pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+            }
             const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
 
             const drawW = w - PR_LEFT;
@@ -1399,17 +1379,17 @@
             const pxPerSec = drawW / timeSpan;
 
             // Background
-            ctx.fillStyle = '#0d0e14';
+            ctx.fillStyle = '#08090d';
             ctx.fillRect(0, 0, w, h);
 
-            // Draw pitch rows
+            // Draw pitch rows grid
             for (let p = pitchMin; p <= pitchMax; p++) {
                 const y = PR_TOP + (pitchMax - p) * pxPerPitch;
-                ctx.fillStyle = isBlackKey(p) ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)';
+                ctx.fillStyle = isBlackKey(p) ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.03)';
                 ctx.fillRect(PR_LEFT, y, drawW, pxPerPitch);
 
                 // Row grid line
-                ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
                 ctx.lineWidth = 0.5;
                 ctx.beginPath();
                 ctx.moveTo(PR_LEFT, y);
@@ -1418,7 +1398,7 @@
 
                 // Highlight C notes
                 if (p % 12 === 0) {
-                    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(PR_LEFT, y + pxPerPitch);
@@ -1427,43 +1407,18 @@
                 }
             }
 
-            // Pitch labels
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            ctx.font = '10px "JetBrains Mono", monospace';
-            const labelStep = pxPerPitch < 10 ? 12 : (pxPerPitch < 16 ? 6 : (pxPerPitch < 24 ? 3 : 1));
-            for (let p = pitchMin; p <= pitchMax; p++) {
-                if (p % labelStep !== 0) continue;
-                const y = PR_TOP + (pitchMax - p) * pxPerPitch + pxPerPitch / 2;
-                ctx.fillStyle = p % 12 === 0 ? '#9ca3af' : '#6b7280';
-                ctx.fillText(midiNoteName(p), PR_LEFT - 6, y);
-            }
-
-            // Time grid
+            // Time grid lines
             const timeStep = getTimeGridStep(timeSpan, drawW);
             const firstTick = Math.ceil(prViewStart / timeStep) * timeStep;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.font = '10px "JetBrains Mono", monospace';
             for (let t = firstTick; t <= prViewEnd; t += timeStep) {
                 const x = PR_LEFT + (t - prViewStart) * pxPerSec;
-                ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
                 ctx.lineWidth = 0.5;
                 ctx.beginPath();
                 ctx.moveTo(x, PR_TOP);
                 ctx.lineTo(x, h);
                 ctx.stroke();
-                ctx.fillStyle = '#6b7280';
-                const mins = Math.floor(t / 60);
-                const secs = Math.floor(t % 60);
-                ctx.fillText(mins > 0 ? `${mins}:${secs.toString().padStart(2,'0')}` : `${secs}s`, x, 6);
             }
-
-            // Borders
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(PR_LEFT, 0); ctx.lineTo(PR_LEFT, h); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, PR_TOP); ctx.lineTo(w, PR_TOP); ctx.stroke();
 
             // Draw notes
             const cornerR = Math.min(3, pxPerPitch / 3);
@@ -1475,20 +1430,25 @@
 
                 const x = PR_LEFT + (note.startTime - prViewStart) * pxPerSec;
                 const xEnd = PR_LEFT + (noteEnd - prViewStart) * pxPerSec;
-                const noteW = Math.max(xEnd - x, 2);
+                
+                const startX = Math.max(x, PR_LEFT);
+                const endX = Math.max(xEnd, PR_LEFT);
+                const noteW = endX - startX;
+                if (noteW <= 0) continue;
+
                 const y = PR_TOP + (pitchMax - note.pitch) * pxPerPitch + 1;
                 const noteH = pxPerPitch - 2;
                 const color = instrumentColorMap[note.instrument] || '#6366f1';
 
                 ctx.fillStyle = color;
                 ctx.globalAlpha = 0.85;
-                prRoundRect(ctx, Math.max(x, PR_LEFT), y, noteW, Math.max(noteH, 2), cornerR);
+                prRoundRect(ctx, startX, y, noteW, Math.max(noteH, 2), cornerR);
                 ctx.fill();
 
                 // Subtle top highlight
                 ctx.globalAlpha = 0.25;
                 ctx.fillStyle = '#ffffff';
-                prRoundRect(ctx, Math.max(x, PR_LEFT), y, noteW, Math.max(noteH / 3, 1), cornerR);
+                prRoundRect(ctx, startX, y, noteW, Math.max(noteH / 3, 1), cornerR);
                 ctx.fill();
                 ctx.globalAlpha = 1;
 
@@ -1496,10 +1456,87 @@
                 if (note.endTime === null) {
                     ctx.fillStyle = color;
                     ctx.globalAlpha = 0.5 + 0.3 * Math.sin(Date.now() / 200);
-                    ctx.fillRect(xEnd - 3, y, 3, Math.max(noteH, 2));
+                    ctx.fillRect(endX - 3, y, 3, Math.max(noteH, 2));
                     ctx.globalAlpha = 1;
                 }
             }
+
+            // Draw Piano Keyboard Keys on the Left (over the note grid)
+            const keyboardW = PR_LEFT;
+            for (let p = pitchMin; p <= pitchMax; p++) {
+                const y = PR_TOP + (pitchMax - p) * pxPerPitch;
+                const isBlack = isBlackKey(p);
+                const isActive = (p === activeSynthPitch);
+                
+                if (isBlack) {
+                    // Black keys (shorter, dark color)
+                    ctx.fillStyle = isActive ? 'rgba(99, 102, 241, 0.6)' : '#1e1f29';
+                    ctx.fillRect(0, y, keyboardW - 16, pxPerPitch);
+                    
+                    ctx.strokeStyle = '#3a3d52';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(0, y, keyboardW - 16, pxPerPitch);
+                } else {
+                    // White keys (full width, light color)
+                    ctx.fillStyle = isActive ? 'rgba(99, 102, 241, 0.4)' : '#f3f4f6';
+                    ctx.fillRect(0, y, keyboardW, pxPerPitch);
+                    
+                    ctx.strokeStyle = '#d1d5db';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(0, y, keyboardW, pxPerPitch);
+                    
+                    // Show note name on C keys
+                    if (p % 12 === 0) {
+                        ctx.fillStyle = '#4b5563';
+                        ctx.font = 'bold 9px var(--font-main)';
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(midiNoteName(p), keyboardW - 5, y + pxPerPitch / 2);
+                    }
+                }
+            }
+
+            // Draw Y-axis border separating keyboard from grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(PR_LEFT, 0);
+            ctx.lineTo(PR_LEFT, h);
+            ctx.stroke();
+
+            // Draw Top Timeline Ruler Bar
+            ctx.fillStyle = '#0d0e14';
+            ctx.fillRect(PR_LEFT, 0, w - PR_LEFT, PR_TOP);
+            
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            for (let t = firstTick; t <= prViewEnd; t += timeStep) {
+                const x = PR_LEFT + (t - prViewStart) * pxPerSec;
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, PR_TOP);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#6b7280';
+                const mins = Math.floor(t / 60);
+                const secs = Math.floor(t % 60);
+                ctx.fillText(mins > 0 ? `${mins}:${secs.toString().padStart(2,'0')}` : `${secs}s`, x, 6);
+            }
+
+            // Draw X-axis border separating timeline from grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, PR_TOP);
+            ctx.lineTo(w, PR_TOP);
+            ctx.stroke();
+
+            // Draw top-left empty corner junction block
+            ctx.fillStyle = '#0a0b10';
+            ctx.fillRect(0, 0, PR_LEFT, PR_TOP);
         }
 
         function prRoundRect(ctx, x, y, w, h, r) {
@@ -1554,14 +1591,38 @@
             queuePianoRollRender();
         }
 
-        // Piano Roll interaction: drag to pan
+        // Piano Roll interaction: drag to pan OR click keyboard key
         pianoRollWrapper.addEventListener('mousedown', (e) => {
-            prDragging = true;
-            prDragStartX = e.clientX;
-            prDragViewStart = prViewStart;
-            prFollowing = false;
-            btnPrFollow.classList.remove('active');
-            btnPrFollow.textContent = 'Follow';
+            const rect = pianoRollCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            if (mouseX <= PR_LEFT && mouseY > PR_TOP) {
+                // Clicked on the piano keyboard keys!
+                const drawH = rect.height - PR_TOP;
+                // Pitch range: default to C3-C6 (48-84) if no notes yet
+                let pitchMin = 48;
+                let pitchMax = 84;
+                if (pianoRollNotes.length > 0) {
+                    pitchMin = Math.max(0, prDetectedMinPitch - 3);
+                    pitchMax = Math.min(127, prDetectedMaxPitch + 3);
+                }
+                const pitchRange = Math.max(pitchMax - pitchMin + 1, 12);
+                const pxPerPitch = drawH / pitchRange;
+                
+                const clickedPitch = pitchMax - Math.floor((mouseY - PR_TOP) / pxPerPitch);
+                if (clickedPitch >= 0 && clickedPitch <= 127) {
+                    playSynthNote(clickedPitch);
+                }
+            } else {
+                // Standard panning drag logic
+                prDragging = true;
+                prDragStartX = e.clientX;
+                prDragViewStart = prViewStart;
+                prFollowing = false;
+                btnPrFollow.classList.remove('active');
+                btnPrFollow.textContent = 'Follow';
+            }
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -1624,6 +1685,9 @@
 
         // Resize handler
         window.addEventListener('resize', () => queuePianoRollRender());
+
+        // Queue initial render on load to draw empty keyboard and grid
+        queuePianoRollRender();
 
     </script>
 </body>
