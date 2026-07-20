@@ -21,13 +21,25 @@ def patch_file(file_path: Path, target_content: str, replacement_content: str):
         return False
 
 def main():
-    venv_dir = Path(__file__).parent / "venv"
-    if not venv_dir.exists():
-        print("Error: virtual environment 'venv' directory not found in workspace root.")
-        sys.exit(1)
-        
+    muscriptor_dir = None
+    try:
+        import muscriptor
+        muscriptor_dir = Path(muscriptor.__file__).parent
+        print(f"Located muscriptor package at: {muscriptor_dir}")
+    except ImportError:
+        # Fallback search for venv or site-packages
+        workspace = Path(__file__).parent
+        candidates = list(workspace.glob("venv/**/muscriptor"))
+        if candidates:
+            muscriptor_dir = candidates[0]
+            print(f"Located muscriptor package in venv at: {muscriptor_dir}")
+
+    if not muscriptor_dir or not muscriptor_dir.exists():
+        print("Notice: 'muscriptor' package is not installed yet. Skipping patch.")
+        return
+
     # Patch auralization.py
-    auralization_path = venv_dir / "Lib" / "site-packages" / "muscriptor" / "utils" / "auralization.py"
+    auralization_path = muscriptor_dir / "utils" / "auralization.py"
     target_aur = """# Pre-downloaded copy at the repo root (kept for checkouts and Docker images
 # that already have one); absent that, the soundfont is fetched from SF2_URL
 # and cached under ~/.cache/muscriptor/.
@@ -68,9 +80,9 @@ def _load_mono_44k(path: Path) -> np.ndarray:
 
 
 def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
-    # Prepend dynamic fluidsynth binary directory to system PATH
+    # Prepend dynamic fluidsynth binary directory to system PATH if on Windows
     fs_bin = r"D:\\Document\\NC-Project\\sheetsage\\AtoScore_Core\\bin"
-    if fs_bin not in os.environ.get("PATH", ""):
+    if os.name == "nt" and fs_bin not in os.environ.get("PATH", ""):
         os.environ["PATH"] = fs_bin + os.path.pathsep + os.environ.get("PATH", "")
 
     if soundfont_path is None:
@@ -83,6 +95,8 @@ def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
             Path("C:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
             Path("D:/Document/MuseScore/share/sound/MS Basic.sf3"),
             Path("D:/Document/NC-Research/Music/MS Basic.sf3"),
+            Path("/content/NC-Musical/MS Basic.sf3"),
+            Path("/content/drive/MyDrive/NC-Musical-Models/MS Basic.sf3"),
         ]
         for path in alt_paths:
             if path.exists():
@@ -102,7 +116,7 @@ def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
     patch_file(auralization_path, target_aur, replacement_aur)
 
     # Patch server.py
-    server_path = venv_dir / "Lib" / "site-packages" / "muscriptor" / "server.py"
+    server_path = muscriptor_dir / "server.py"
     target_server = """    @app.get("/soundfonts/MuseScore_General.sf3")
     async def soundfont() -> FileResponse:
         \"\"\"Compressed soundfont for the web UI's in-browser synthesizer.
@@ -127,6 +141,8 @@ def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
                 Path("C:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
                 Path("D:/Document/MuseScore/share/sound/MS Basic.sf3"),
                 Path("D:/Document/NC-Research/Music/MS Basic.sf3"),
+                Path("/content/NC-Musical/MS Basic.sf3"),
+                Path("/content/drive/MyDrive/NC-Musical-Models/MS Basic.sf3"),
             ]
             for fb in fallbacks:
                 if fb.exists():
