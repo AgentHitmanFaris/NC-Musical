@@ -335,6 +335,53 @@ def main():
 
         move_route_before_static_mount(app)
 
+    # Desktop save endpoint — opens native file dialog for pywebview/file:// mode
+    @app.post("/save_file")
+    async def save_file(
+        data: str = Form(...),
+        filename: str = Form("output.mid"),
+        filetype: str = Form("midi"),
+    ):
+        """Save file via native OS dialog. Used by desktop mode where blob downloads are blocked."""
+        import tkinter as tk
+        from tkinter import filedialog
+
+        # Determine file type filters
+        filetypes_map = {
+            "midi": [("MIDI files", "*.mid"), ("All files", "*.*")],
+            "json": [("JSON files", "*.json"), ("All files", "*.*")],
+        }
+        ft = filetypes_map.get(filetype, [("All files", "*.*")])
+
+        # Decode the base64 data
+        file_bytes = base64.b64decode(data)
+
+        # Open native save dialog on a separate thread to avoid blocking
+        def do_save():
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            save_path = filedialog.asksaveasfilename(
+                initialfile=filename,
+                filetypes=ft,
+                defaultextension=ft[0][1].replace("*", ""),
+            )
+            root.destroy()
+            return save_path
+
+        import asyncio
+        save_path = await asyncio.to_thread(do_save)
+
+        if not save_path:
+            return {"status": "cancelled"}
+
+        with open(save_path, "wb") as f:
+            f.write(file_bytes)
+
+        return {"status": "saved", "path": save_path}
+
+    move_route_before_static_mount(app)
+
     # Add YouTube transcription endpoint
     @app.post("/transcribe_youtube")
     async def transcribe_youtube(

@@ -1012,6 +1012,67 @@
         // Otherwise, fallback to the current window location port or 8222.
         const API_PORT = typeof BACKEND_PORT !== 'undefined' ? BACKEND_PORT : window.location.port || 8222;
         const API_BASE = `http://127.0.0.1:${API_PORT}`;
+        
+        // Detect if running in desktop/pywebview mode (file:// protocol)
+        // Blob URL downloads via a.click() are silently blocked in WebView2 file:// mode
+        const IS_DESKTOP_MODE = window.location.protocol === 'file:';
+
+        /**
+         * Save a file to the user's disk. In browser mode, uses standard blob download.
+         * In desktop mode, uses the server /save_file endpoint with native OS dialog.
+         * @param {Uint8Array|ArrayBuffer|string} content - File content
+         * @param {string} filename - Suggested filename
+         * @param {string} mimeType - MIME type (e.g. 'audio/midi', 'application/json')
+         * @param {string} filetype - File type key for dialog filter ('midi' or 'json')
+         */
+        async function saveFileToUser(content, filename, mimeType, filetype) {
+            if (IS_DESKTOP_MODE) {
+                // Desktop mode: send to server which opens native save dialog
+                try {
+                    let b64Data;
+                    if (typeof content === 'string') {
+                        // Text content — encode to base64
+                        b64Data = btoa(unescape(encodeURIComponent(content)));
+                    } else {
+                        // Binary content (Uint8Array / ArrayBuffer)
+                        const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
+                        let binary = '';
+                        for (let i = 0; i < bytes.length; i++) {
+                            binary += String.fromCharCode(bytes[i]);
+                        }
+                        b64Data = btoa(binary);
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('data', b64Data);
+                    formData.append('filename', filename);
+                    formData.append('filetype', filetype);
+                    
+                    const response = await fetch(`${API_BASE}/save_file`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    const result = await response.json();
+                    if (result.status === 'saved') {
+                        console.log('File saved to:', result.path);
+                    } else if (result.status === 'cancelled') {
+                        console.log('Save cancelled by user');
+                    }
+                } catch (e) {
+                    console.error('Desktop save failed:', e);
+                    alert('Failed to save file: ' + e.message);
+                }
+            } else {
+                // Browser mode: standard blob download
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+            }
+        }
 
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -1418,15 +1479,19 @@
             isSynthLoading = true;
             console.log("Loading MS Basic.sf3 soundfont for live preview...");
             try {
+                // 1. Fetch soundfont data from server
                 if (!soundfontData) {
                     const sf3Response = await fetch(`${API_BASE}/soundfonts/MuseScore_General.sf3`);
                     if (!sf3Response.ok) throw new Error("Server returned status " + sf3Response.status);
                     soundfontData = await sf3Response.arrayBuffer();
+                    console.log("SF3 soundfont downloaded:", (soundfontData.byteLength / 1024 / 1024).toFixed(1), "MB");
                 }
                 
+                // 2. Import SpessaSynth library (v4.x API)
                 const spessaModule = await import('https://cdn.jsdelivr.net/npm/spessasynth_lib@latest/dist/index.js');
-                const Synthesizer = spessaModule.Synthesizer;
+                const { WorkletSynthesizer } = spessaModule;
                 
+                // 3. Create AudioContext
                 if (!audioCtx) {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 }
@@ -1434,7 +1499,20 @@
                     await audioCtx.resume();
                 }
                 
-                spessaSynth = await Synthesizer.create(audioCtx, soundfontData);
+                // 4. Register the AudioWorklet processor module
+                const processorUrl = 'https://cdn.jsdelivr.net/npm/spessasynth_lib@latest/dist/spessasynth_processor.min.js';
+                await audioCtx.audioWorklet.addModule(processorUrl);
+                console.log("SpessaSynth worklet processor registered.");
+                
+                // 5. Create the WorkletSynthesizer and connect to output
+                spessaSynth = new WorkletSynthesizer(audioCtx);
+                spessaSynth.connect(audioCtx.destination);
+                
+                // 6. Load the SF3 soundfont into the synthesizer
+                await spessaSynth.soundBankManager.addSoundBank(soundfontData, "ms_basic");
+                
+                // 7. Wait for synthesizer to be ready
+                await spessaSynth.isReady;
                 console.log("Live preview soundfont loaded successfully!");
                 
                 // Set General MIDI program changes:
@@ -1443,6 +1521,7 @@
                 spessaSynth.programChange(2, 33); // Bass (Fingered)
             } catch (e) {
                 console.error("Failed to initialize SpessaSynth soundfont preview:", e);
+                spessaSynth = null;
             } finally {
                 isSynthLoading = false;
             }
@@ -2188,13 +2267,9 @@
         }
 
         // Action: Download MIDI
-        btnDownloadMidi.addEventListener('click', () => {
+        btnDownloadMidi.addEventListener('click', async () => {
             const bytes = getCurrentMidiBytes();
             if (!bytes) return;
-            
-            const blob = new Blob([bytes], { type: 'audio/midi' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
             
             // Clean original filename and append .mid
             let outputName = 'transcription';
@@ -2204,12 +2279,7 @@
                 outputName = 'youtube_transcription';
             }
             
-            a.download = `${outputName}.mid`;
-            a.href = url;
-            a.click();
-            
-            // Clean up
-            setTimeout(() => URL.revokeObjectURL(url), 100);
+            await saveFileToUser(bytes, `${outputName}.mid`, 'audio/midi', 'midi');
         });
 
         // Action: Auralize (Synthesize MIDI back to WAV audio)
@@ -2311,7 +2381,7 @@
         }
 
         // Save Project Button
-        document.getElementById('btnSaveProject').addEventListener('click', () => {
+        document.getElementById('btnSaveProject').addEventListener('click', async () => {
             if (pianoRollNotes.length === 0) {
                 alert("No notes in the piano roll to save.");
                 return;
@@ -2324,14 +2394,9 @@
                 manualNoteIdCounter: manualNoteIdCounter,
                 originalAudioName: originalAudioLoaded ? originalAudioName : ''
             };
-            const blob = new Blob([JSON.stringify(projectData, null, 4)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
+            const jsonStr = JSON.stringify(projectData, null, 4);
             const cleanName = originalAudioName.replace(/\.[^/.]+$/, "") || "muscriptor_project";
-            a.download = `${cleanName}_project.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+            await saveFileToUser(jsonStr, `${cleanName}_project.json`, 'application/json', 'json');
         });
 
         // Load Project Button
@@ -3141,6 +3206,13 @@
             prFollowing = !prFollowing;
             btnPrFollow.classList.toggle('active');
             btnPrFollow.textContent = prFollowing ? 'Following' : 'Follow';
+            if (prFollowing) {
+                const span = prViewEnd - prViewStart;
+                const targetTime = isPlaying ? playbackTime : (pianoRollNotes.length > 0 ? pianoRollNotes[pianoRollNotes.length - 1].startTime : playbackTime);
+                prViewStart = Math.max(0, targetTime - span * 0.2);
+                prViewEnd = prViewStart + span;
+                queuePianoRollRender();
+            }
         });
 
         // Playback Logic
@@ -3163,15 +3235,19 @@
                 if (t > maxTime) maxTime = t;
             }
 
-            // Start playing from current playhead position if it's visible, otherwise start from view start.
-            // If it's past the end of the song, reset to 0.
-            const { pxPerSec } = getXCoords();
-            const prViewEnd = prViewStart + (pianoRollCanvas.width - PR_LEFT) / pxPerSec;
+            // Start playing from current playhead position
+            const timeSpan = prViewEnd - prViewStart;
             if (playbackTime >= maxTime) {
                 playbackTime = 0;
                 prViewStart = 0;
+                prViewEnd = prViewStart + timeSpan;
             } else if (playbackTime < prViewStart || playbackTime > prViewEnd) {
-                playbackTime = prViewStart;
+                if (prFollowing) {
+                    prViewStart = Math.max(0, playbackTime - timeSpan * 0.1);
+                    prViewEnd = prViewStart + timeSpan;
+                } else {
+                    playbackTime = prViewStart;
+                }
             }
 
             if (originalAudioLoaded && originalAudioPlayer.src) {
@@ -3239,10 +3315,10 @@
                     }
                 }
                 
-                // If following, auto-pan the view
-                if (prFollowing && playbackTime > prViewEnd) {
+                // If following, auto-pan the view when playhead approaches edge
+                if (prFollowing && (playbackTime > prViewEnd - 0.5 || playbackTime < prViewStart)) {
                     const span = prViewEnd - prViewStart;
-                    prViewStart = playbackTime;
+                    prViewStart = Math.max(0, playbackTime - span * 0.1);
                     prViewEnd = prViewStart + span;
                 }
                 
