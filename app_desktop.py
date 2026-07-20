@@ -21,15 +21,19 @@ if fs_bin not in os.environ.get("PATH", ""):
 # Configure local D-drive path for HuggingFace home
 local_hf_home = os.path.join(project_dir, ".cache", "huggingface")
 old_hf_home = os.path.expanduser("~/.cache/huggingface")
-if os.path.exists(old_hf_home) and not os.path.exists(local_hf_home):
-    print(f"Migrating HuggingFace cache to D-drive: {local_hf_home}...")
-    try:
-        os.makedirs(os.path.dirname(local_hf_home), exist_ok=True)
-        shutil.copytree(old_hf_home, local_hf_home)
-        print("Migration complete!")
-    except Exception as e:
-        print(f"Warning: Cache migration failed: {e}")
 
+# Non-blocking async cache migration to prevent startup freezing
+def _async_migrate_cache():
+    if os.path.exists(old_hf_home) and not os.path.exists(local_hf_home):
+        print(f"Migrating HuggingFace cache to D-drive in background: {local_hf_home}...")
+        try:
+            os.makedirs(os.path.dirname(local_hf_home), exist_ok=True)
+            shutil.copytree(old_hf_home, local_hf_home)
+            print("Migration complete!")
+        except Exception as e:
+            print(f"Warning: Cache migration failed: {e}")
+
+threading.Thread(target=_async_migrate_cache, daemon=True).start()
 os.environ["HF_HOME"] = local_hf_home
 
 # ── Log redirect (pythonw.exe has no console) ─────────────────────────────────
@@ -154,7 +158,6 @@ class LauncherApi:
                     endpoint = f"{colab_url}/transcribe_youtube?{params}"
                     req = urllib.request.Request(endpoint, headers={"User-Agent": "NC-Musical-Desktop/1.0"})
                     with urllib.request.urlopen(req) as resp:
-                        # SSE stream processing
                         for line in resp:
                             line_str = line.decode('utf-8').strip()
                             if line_str.startswith("data: "):
@@ -167,7 +170,6 @@ class LauncherApi:
                                     pass
                 elif file_path:
                     self.win.evaluate_js(f"updateCloudStatus('loading', 'Uploading file to Colab GPU...', 20);")
-                    # multipart upload to colab /transcribe
                     import requests
                     with open(file_path, 'rb') as f:
                         files = {'file': (os.path.basename(file_path), f)}
@@ -232,11 +234,12 @@ if __name__ == "__main__":
     window = webview.create_window(
         "NC-Musical — Select Mode",
         launcher_path,
-        width=720,
-        height=620,
+        width=880,
+        height=740,
+        min_size=(800, 640),
         js_api=api,
         background_color="#07080c",
-        resizable=False,
+        resizable=True,
     )
     window_ref[0] = window
 
