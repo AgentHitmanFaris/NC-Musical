@@ -1008,10 +1008,15 @@
     </main>
 
     <script>
-        // Resolve backend port: if BACKEND_PORT is injected by pywebview config.js, use it.
-        // Otherwise, fallback to the current window location port or 8222.
-        const API_PORT = typeof BACKEND_PORT !== 'undefined' ? BACKEND_PORT : window.location.port || 8222;
-        const API_BASE = `http://127.0.0.1:${API_PORT}`;
+        // Resolve backend:
+        // - Cloud mode:  config.js sets BACKEND_URL = "https://xxx.trycloudflare.com"
+        // - Local mode:  config.js sets BACKEND_PORT = 8222 (or dynamic port)
+        // - Server mode: use window.location.origin directly
+        const API_BASE = (typeof BACKEND_URL !== 'undefined' && BACKEND_URL)
+            ? BACKEND_URL.replace(/\/$/, '')
+            : (typeof BACKEND_PORT !== 'undefined')
+                ? `http://127.0.0.1:${BACKEND_PORT}`
+                : window.location.origin;
         
         /**
          * Save a file to the user's disk. Uses the server /save_file endpoint with native OS dialog,
