@@ -484,34 +484,6 @@ def main():
 
     print(f"Starting server on http://{args.host}:{args.port}")
     print(f"To open GUI, visit: http://{args.host}:{args.port}/index.html")
-
-    if args.share:
-        try:
-            import gradio as gr
-            print("\n" + "="*65)
-            print("Launching Gradio public share link (gradio.live)...")
-            print("="*65 + "\n")
-            
-            # Run uvicorn server in daemon background thread
-            server_thread = threading.Thread(
-                target=lambda: uvicorn.run(app, host=args.host, port=args.port, log_level="warning"),
-                daemon=True
-            )
-            server_thread.start()
-            
-            # Create Gradio Blocks UI embedding the Piano Roll interface iframe
-            with gr.Blocks(title="MuScriptor AMT Web Editor") as demo:
-                gr.Markdown("## MuScriptor AI Music Transcription & Piano Roll Editor")
-                gr.HTML(
-                    f'<iframe src="http://127.0.0.1:{args.port}/index.html" '
-                    'style="width:100%; height:900px; border:none; border-radius:8px;"></iframe>'
-                )
-            
-            demo.launch(share=True, inline=False)
-            return
-        except Exception as e:
-            print(f"Gradio share notice: {e}. Falling back to standard uvicorn server.")
-
     uvicorn.run(app, host=args.host, port=args.port)
 
 if __name__ == "__main__":
