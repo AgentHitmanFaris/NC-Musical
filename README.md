@@ -19,11 +19,15 @@ Run NC-Musical with free NVIDIA GPU acceleration without installing local CUDA d
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb)
 
-1. Open the [NC_Musical_Colab.ipynb](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb) notebook in Google Colab.
-2. Select **Runtime -> Change runtime type -> T4 GPU**.
-3. Run Step 1 (Mount Google Drive) to enable persistent model caching. All model weights (~1.2GB) and SoundFonts will be stored in your Drive to make future startups instant.
-4. Run Steps 2 to 4 to initialize dependencies and launch the backend.
-5. Click the generated proxy URL (`https://...googleusercontent.com/.../index.html` or Cloudflare Tunnel link) to open the interactive Web GUI directly in your browser.
+> **Note for Private Repositories:** Because this repository is private, opening via the badge link requires authorizing Google Colab to access private repos:
+> 1. Go to [colab.research.google.com](https://colab.research.google.com), select the **GitHub** tab, and check **Include private repos**.
+> 2. Click **Authorize Colab** and select `AgentHitmanFaris/NC-Musical` -> `NC_Musical_Colab.ipynb`.
+> 3. *Alternative:* Click **File -> Upload notebook** in Colab and upload `NC_Musical_Colab.ipynb` directly from your local repository folder.
+
+1. In Colab, select **Runtime -> Change runtime type -> T4 GPU**.
+2. Run Step 1 (Mount Google Drive) to enable persistent model caching.
+3. Run Steps 2 to 4 to initialize dependencies, configure `HF_TOKEN`, and launch the backend.
+4. Click the generated proxy URL (`https://...googleusercontent.com/.../index.html` or Cloudflare Tunnel link) to open the interactive Web GUI directly in your browser.
 
 ---
 
