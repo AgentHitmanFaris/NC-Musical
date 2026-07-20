@@ -17,7 +17,8 @@ if os.path.exists(old_hf_home) and not os.path.exists(local_hf_home):
     except Exception as e:
         print(f"Warning: Failed to auto-migrate cache: {e}")
 
-os.environ["HF_HOME"] = local_hf_home
+if "HF_HOME" not in os.environ:
+    os.environ["HF_HOME"] = local_hf_home
 import argparse
 import subprocess
 import tempfile
