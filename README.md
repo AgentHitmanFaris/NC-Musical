@@ -51,11 +51,19 @@ NC-Musical is a high-performance, GPU-accelerated desktop application for Automa
 
 ## How to Run
 
-Simply run the desktop launcher script in the workspace root:
+### Local Desktop Mode
+Run the desktop launcher script in the workspace root:
 ```bash
 run_desktop.bat
 ```
 This starts the Python FastAPI server in the background and launches the desktop GUI window.
+
+### Google Colab (Cloud GPU Mode)
+Run NC-Musical on Google Colab with free GPU acceleration:
+1. Open the [NC_Musical_Colab.ipynb](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb) notebook in Google Colab.
+2. Select **Runtime -> Change runtime type -> T4 GPU**.
+3. Run all cells in order.
+4. Click the generated public link to open the interactive Web GUI directly in your browser.
 
 ---
 
