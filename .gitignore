@@ -14,3 +14,5 @@ __pycache__/
 *.sf2
 *.sf3
 config.js
+cookies.txt
+.temp/

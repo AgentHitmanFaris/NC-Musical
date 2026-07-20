@@ -157,5 +157,71 @@ def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
 
     patch_file(server_path, target_server, replacement_server)
 
+    # Patch tokenizer/mt3.py for instrument alias resolution
+    mt3_path = muscriptor_dir / "tokenizer" / "mt3.py"
+    target_mt3 = """def instrument_group_from_names(names: Iterable[str]) -> str:
+    \"\"\"Map exact instrument group names to the model's conditioning string.
+
+    The strict counterpart of :func:`resolve_instrument_names`: every name
+    must appear verbatim in ``MT3_FULL_PLUS_GROUP_NAMES``. Raises ValueError
+    listing the unknown names otherwise.
+    \"\"\"
+    names = list(names)
+    unknown = [n for n in names if n not in MT3_FULL_PLUS_GROUP_NAMES]
+    if unknown:
+        raise ValueError(
+            f"unknown instrument name(s): {', '.join(map(repr, unknown))}; "
+            f"valid names: {', '.join(MT3_FULL_PLUS_GROUP_NAMES)}"
+        )
+    return " ".join(str(MT3_FULL_PLUS_GROUP_NAMES[n]) for n in names)"""
+
+    replacement_mt3 = """_INSTRUMENT_ALIASES = {
+    "piano": "acoustic_piano",
+    "guitar": "acoustic_guitar",
+    "electric_guitar": "clean_electric_guitar",
+    "bass": "electric_bass",
+    "drums": "drums",
+    "drum": "drums",
+    "percussion": "drums",
+    "strings": "string_ensemble",
+    "brass": "brass_section",
+    "sax": "soprano_and_alto_sax",
+    "saxophone": "soprano_and_alto_sax",
+    "flute": "flutes",
+    "synth": "synth_lead",
+    "pad": "synth_pad",
+    "vocal": "voice",
+    "vocals": "voice",
+}
+
+def instrument_group_from_names(names: Iterable[str]) -> str:
+    \"\"\"Map instrument names or shorthand aliases to conditioning string.\"\"\"
+    resolved_names = []
+    for n in names:
+        key = n.strip().lower()
+        if key in MT3_FULL_PLUS_GROUP_NAMES:
+            resolved_names.append(key)
+        elif key in _INSTRUMENT_ALIASES:
+            resolved_names.append(_INSTRUMENT_ALIASES[key])
+        else:
+            matched = False
+            for target_name in MT3_FULL_PLUS_GROUP_NAMES:
+                if key in target_name:
+                    resolved_names.append(target_name)
+                    matched = True
+                    break
+            if not matched:
+                resolved_names.append(n)
+
+    unknown = [n for n in resolved_names if n not in MT3_FULL_PLUS_GROUP_NAMES]
+    if unknown:
+        raise ValueError(
+            f"unknown instrument name(s): {', '.join(map(repr, unknown))}; "
+            f"valid names: {', '.join(MT3_FULL_PLUS_GROUP_NAMES)}"
+        )
+    return " ".join(str(MT3_FULL_PLUS_GROUP_NAMES[n]) for n in resolved_names)"""
+
+    patch_file(mt3_path, target_mt3, replacement_mt3)
+
 if __name__ == "__main__":
     main()
