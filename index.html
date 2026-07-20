@@ -1013,65 +1013,60 @@
         const API_PORT = typeof BACKEND_PORT !== 'undefined' ? BACKEND_PORT : window.location.port || 8222;
         const API_BASE = `http://127.0.0.1:${API_PORT}`;
         
-        // Detect if running in desktop/pywebview mode (file:// protocol)
-        // Blob URL downloads via a.click() are silently blocked in WebView2 file:// mode
-        const IS_DESKTOP_MODE = window.location.protocol === 'file:';
-
         /**
-         * Save a file to the user's disk. In browser mode, uses standard blob download.
-         * In desktop mode, uses the server /save_file endpoint with native OS dialog.
+         * Save a file to the user's disk. Uses the server /save_file endpoint with native OS dialog,
+         * with fallback to standard browser blob download.
          * @param {Uint8Array|ArrayBuffer|string} content - File content
          * @param {string} filename - Suggested filename
          * @param {string} mimeType - MIME type (e.g. 'audio/midi', 'application/json')
          * @param {string} filetype - File type key for dialog filter ('midi' or 'json')
          */
         async function saveFileToUser(content, filename, mimeType, filetype) {
-            if (IS_DESKTOP_MODE) {
-                // Desktop mode: send to server which opens native save dialog
-                try {
-                    let b64Data;
-                    if (typeof content === 'string') {
-                        // Text content — encode to base64
-                        b64Data = btoa(unescape(encodeURIComponent(content)));
-                    } else {
-                        // Binary content (Uint8Array / ArrayBuffer)
-                        const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
-                        let binary = '';
-                        for (let i = 0; i < bytes.length; i++) {
-                            binary += String.fromCharCode(bytes[i]);
-                        }
-                        b64Data = btoa(binary);
+            // Attempt to save via backend /save_file endpoint (opens native OS file save dialog)
+            try {
+                let b64Data;
+                if (typeof content === 'string') {
+                    b64Data = btoa(unescape(encodeURIComponent(content)));
+                } else {
+                    const bytes = content instanceof Uint8Array ? content : new Uint8Array(content);
+                    let binary = '';
+                    for (let i = 0; i < bytes.length; i++) {
+                        binary += String.fromCharCode(bytes[i]);
                     }
-                    
-                    const formData = new FormData();
-                    formData.append('data', b64Data);
-                    formData.append('filename', filename);
-                    formData.append('filetype', filetype);
-                    
-                    const response = await fetch(`${API_BASE}/save_file`, {
-                        method: 'POST',
-                        body: formData,
-                    });
+                    b64Data = btoa(binary);
+                }
+                
+                const formData = new FormData();
+                formData.append('data', b64Data);
+                formData.append('filename', filename);
+                formData.append('filetype', filetype);
+                
+                const response = await fetch(`${API_BASE}/save_file`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (response.ok) {
                     const result = await response.json();
                     if (result.status === 'saved') {
                         console.log('File saved to:', result.path);
+                        return;
                     } else if (result.status === 'cancelled') {
                         console.log('Save cancelled by user');
+                        return;
                     }
-                } catch (e) {
-                    console.error('Desktop save failed:', e);
-                    alert('Failed to save file: ' + e.message);
                 }
-            } else {
-                // Browser mode: standard blob download
-                const blob = new Blob([content], { type: mimeType });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 100);
+            } catch (e) {
+                console.warn('Backend save endpoint failed, falling back to browser download:', e);
             }
+
+            // Fallback: standard browser blob download
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
         const loadingOverlay = document.getElementById('loadingOverlay');

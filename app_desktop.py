@@ -53,6 +53,20 @@ def run_server(port):
     sys.argv = [sys.argv[0], "--port", str(port), "--model", "medium", "--device", "auto"]
     main()
 
+def wait_for_server(port, timeout=15):
+    """Wait for the FastAPI backend server to be ready before opening the WebView window."""
+    start = time.time()
+    health_url = f"http://127.0.0.1:{port}/health"
+    while time.time() - start < timeout:
+        try:
+            req = urllib.request.Request(health_url)
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status == 200:
+                    return True
+        except Exception:
+            time.sleep(0.1)
+    return False
+
 if __name__ == "__main__":
     port = find_free_port()
     
@@ -65,16 +79,17 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
     server_thread.start()
     
-    # Get absolute local path to index.html
-    html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "index.html"))
-    html_url = f"file:///{html_path.replace(os.sep, '/')}"
+    # Wait for backend server to complete initialization
+    print(f"Waiting for backend server to start on port {port}...")
+    wait_for_server(port)
     
-    print(f"Launching GUI window instantly at: {html_url}")
+    server_url = f"http://127.0.0.1:{port}/index.html"
+    print(f"Launching GUI window at: {server_url}")
     
-    # Start native WebView2 window wrapper immediately
+    # Start native WebView2 window wrapper pointing to local HTTP server
     webview.create_window(
         "MuScriptor AMT Desktop",
-        html_url,
+        server_url,
         width=1320,
         height=850,
         background_color='#07080c'
