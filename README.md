@@ -1,71 +1,115 @@
-# NC-Musical (MuScriptor AMT Desktop Editor)
+# NC-Musical: AI Music Transcription & Interactive Editor
 
-NC-Musical is a high-performance, GPU-accelerated desktop application for Automatic Music Transcription (AMT) and interactive note editing. Built on top of the MuScriptor engine, it features an interactive AnthemScore-style Piano Roll Editor and a real-time synchronized playback engine.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
+![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C)
+![FastAPI](https://img.shields.io/badge/FastAPI-Server-009688)
+![SpessaSynth](https://img.shields.io/badge/SpessaSynth-v4.x%20SF3-purple)
+![License](https://img.shields.io/badge/License-Proprietary-red)
 
----
-
-## Key Features
-
-### 1. Interactive AnthemScore-Style Piano Roll Editor
-* **Select Mode (`1`):** Select notes, shift pitch/time via mouse dragging or arrow keys, resize boundaries by dragging note edges, and box-select multiple notes (`Shift + Drag`).
-* **Draw Mode (`2`):** Click and drag on empty grid positions to paint new notes matching the active instrument.
-* **Erase Mode (`3`):** Click notes to erase them instantly, or press `Delete` / `Backspace` on selected notes.
-* **History Operations:** Undo (`Ctrl + Z`) and Redo (`Ctrl + Y`) support with a 50-step change stack.
-* **Visual Pan / Zoom / Follow:** 
-  * Keyboard shortcuts (`A` to scroll left, `D` to scroll right, mouse wheel to zoom in/out).
-  * Auto-Follow mode that centers and smoothly pans the view during playback or live transcription.
-
-### 2. Multi-Instrument SoundFont & Synth Engine
-* **SpessaSynth SF3 Live Preview:** Integrated Web Audio API synthesizer powered by SpessaSynth v4 and local `MS Basic.sf3` soundfont for accurate multi-instrument sound reproduction.
-* **Fallback Web Synth:** Synthetic fallback oscillators for drum bursts, plucked guitars, low bass, and general keyboards when soundfont is uninitialized.
-* **Solo & Mute Channels:** Individual controls to mute or solo specific tracks during real-time MIDI playback.
-* **Volume Controls:** Full scaling of original audio and synth volume via dedicated control sliders.
-
-### 3. Project & File Management
-* **Native Desktop File Saving:** Desktop mode (`file://` protocol) routes save requests through a dedicated backend endpoint (`/save_file`) that launches native OS file save dialogs for MIDI and project files.
-* **Save Project:** Instantly package all notes, customized tracks, active instruments, and audio references into a `.json` project file.
-* **Load Project:** Upload any saved project `.json` to continue editing your transcription seamlessly.
-* **Download MIDI:** Export full transcription or edited piano roll notes as standard `.mid` files.
-* **Local Auto-Save:** Automatically saves progress (debounced) to LocalStorage with a session restore prompt upon application launch.
-
-### 4. GPU Inference & Backend Audio Rendering
-* **GPU Detection:** Automatic detection of CUDA-capable hardware (e.g., NVIDIA GPUs) to run transcription inferences.
-* **FluidSynth Backend Rendering:** Utilizes local `MS Basic.sf3` soundfont files and standalone FluidSynth installations for high-quality audio export and auralization.
+NC-Musical is a production-grade, GPU-accelerated desktop and web application for Automatic Music Transcription (AMT) and interactive note editing. Built on top of the MuScriptor engine (MT3 architecture), it combines high-fidelity AI note extraction with an AnthemScore-style Piano Roll Editor and a real-time Web Audio SoundFont synthesis engine.
 
 ---
 
-## Installation & Setup
+## Quick Start Guide
 
-1. **Prerequisites:**
-   * Python 3.10+ (installed in `venv`)
-   * Standalone FluidSynth binaries placed in `D:\Document\NC-Project\sheetsage\AtoScore_Core\bin`
-   * PyTorch installed with CUDA support in the virtual environment.
+### 1. Cloud GPU Mode (Google Colab - Recommended)
 
-2. **Patching Backend Dependencies:**
-   Run the utility script to override default soundfont loaders in the venv:
-   ```bash
-   venv/Scripts/python.exe patch_muscriptor.py
+Run NC-Musical with free NVIDIA GPU acceleration without installing local CUDA drivers or dependencies:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb)
+
+1. Open the [NC_Musical_Colab.ipynb](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb) notebook in Google Colab.
+2. Select **Runtime -> Change runtime type -> T4 GPU**.
+3. Run Step 1 (Mount Google Drive) to enable persistent model caching. All model weights (~1.2GB) and SoundFonts will be stored in your Drive to make future startups instant.
+4. Run Steps 2 to 4 to initialize dependencies and launch the backend.
+5. Click the generated proxy URL (`https://...googleusercontent.com/.../index.html` or Cloudflare Tunnel link) to open the interactive Web GUI directly in your browser.
+
+---
+
+### 2. Local Desktop Application (Windows)
+
+Launch NC-Musical as a native desktop application powered by WebView2:
+
+1. Double-click the launcher script in the workspace root:
+   ```cmd
+   run_desktop.bat
+   ```
+2. Or execute via PowerShell/CMD:
+   ```powershell
+   .\venv\Scripts\python.exe app_desktop.py
    ```
 
 ---
 
-## How to Run
+### 3. Local Web Server Mode
 
-### Local Desktop Mode
-Run the desktop launcher script in the workspace root:
-```bash
-run_desktop.bat
+Run the FastAPI backend server directly and access the Web GUI from any web browser:
+
+```powershell
+.\venv\Scripts\python.exe server_gui.py --port 8222 --model medium --device auto
 ```
-This starts the Python FastAPI server in the background and launches the desktop GUI window.
 
-### Google Colab (Cloud GPU Mode)
-Run NC-Musical on Google Colab with free GPU acceleration:
-1. Open the [NC_Musical_Colab.ipynb](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb) notebook in Google Colab.
-2. Select **Runtime -> Change runtime type -> T4 GPU**.
-3. Run all cells in order.
-4. Click the generated public link to open the interactive Web GUI directly in your browser.
+Then open your browser and navigate to: `http://127.0.0.1:8222/index.html`
+
+---
+
+## Core Features
+
+### AnthemScore-Style Piano Roll Editor
+* **Select & Edit Mode (`1`):** Click and drag notes to adjust pitch and time. Drag note edges to alter duration. Select multiple notes using `Shift + Box Select` or keyboard arrow keys for micro-tuning.
+* **Draw Mode (`2`):** Paint new notes on grid locations corresponding to the active target instrument.
+* **Erase Mode (`3`):** Click notes to delete them instantly, or press `Delete` / `Backspace` on selected note clusters.
+* **Undo/Redo Stack:** Full 50-step state history with `Ctrl + Z` and `Ctrl + Y` support.
+* **Smart Auto-Follow:** Viewport smoothly pans during real-time playback or live AI transcription to keep the active playhead centered.
+
+### Multi-Instrument SF3 SoundFont Synthesis
+* **SpessaSynth SF3 Integration:** Integrated Web Audio API synthesizer utilizing `MS Basic.sf3` for multi-instrument sound reproduction (Piano, Nylon Guitar, Fingered Bass, Drums).
+* **AudioWorklet Architecture:** Multi-threaded Web Audio processing prevents UI thread stuttering during note preview.
+* **Solo & Mute Channels:** Granular per-track controls to solo or mute specific instruments during real-time MIDI playback.
+* **Fallback Web Synth:** Synthetic oscillator fallback for quick preview if SoundFont loading is bypassed.
+
+### Session & Project Management
+* **Native OS File Save Dialogs:** Saves project JSON files and MIDI exports via a backend endpoint (`/save_file`), triggering native Windows File Save dialogs.
+* **Save Project:** Package notes, track states, active instruments, and audio references into `.json` project files.
+* **Load Project:** Restore previous editing sessions from `.json` files.
+* **Download MIDI:** Export full transcription or edited piano roll notes as standard `.mid` files.
+* **Auto-Save Protection:** Debounced LocalStorage auto-save with a session restore prompt on application launch.
+
+### GPU Acceleration & Backend Audio Export
+* **CUDA Hardware Detection:** Automatic detection and allocation of CUDA devices for MT3 model inference.
+* **FluidSynth Backend Auralization:** Render transcribed MIDI back into high-fidelity WAV audio using local `MS Basic.sf3` SoundFonts and FluidSynth.
+
+---
+
+## Command Line Arguments (`server_gui.py`)
+
+| Argument | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--host` | `str` | `127.0.0.1` | Bind IP address for the FastAPI server |
+| `--port` | `int` | `8222` | Port number to listen on |
+| `--model` | `str` | `large` | Model size: `small`, `medium`, or `large` |
+| `--device` | `str` | `auto` | Execution device: `cuda`, `cpu`, or `auto` |
+
+---
+
+## Repository Structure
+
+```
+NC-Musical/
+├── NC_Musical_Colab.ipynb   # Google Colab Notebook with GPU & Drive caching
+├── index.html               # Main Web GUI (Piano Roll, SpessaSynth, Controls)
+├── app_desktop.py           # Native pywebview Desktop Application Launcher
+├── server_gui.py            # FastAPI Backend (Transcription, Save Dialogs, Auralize)
+├── patch_muscriptor.py      # Dependency patching utility for muscriptor
+├── run_desktop.bat          # One-click Windows desktop startup script
+├── MS Basic.sf3             # High-quality General MIDI SoundFont
+├── config.js                # Dynamic backend port configuration
+└── README.md                # Project documentation
+```
 
 ---
 
 ## License
+
 This project is private and proprietary. All rights reserved.
