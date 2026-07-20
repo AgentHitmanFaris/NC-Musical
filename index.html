@@ -1409,6 +1409,62 @@
         const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
         const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
+        let spessaSynth = null;
+        let isSynthLoading = false;
+        let soundfontData = null;
+
+        async function initSpessaSynth() {
+            if (spessaSynth || isSynthLoading) return;
+            isSynthLoading = true;
+            console.log("Loading MS Basic.sf3 soundfont for live preview...");
+            try {
+                if (!soundfontData) {
+                    const sf3Response = await fetch(`${API_BASE}/soundfonts/MuseScore_General.sf3`);
+                    if (!sf3Response.ok) throw new Error("Server returned status " + sf3Response.status);
+                    soundfontData = await sf3Response.arrayBuffer();
+                }
+                
+                const spessaModule = await import('https://cdn.jsdelivr.net/npm/spessasynth_lib@latest/dist/index.js');
+                const Synthesizer = spessaModule.Synthesizer;
+                
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+                
+                spessaSynth = await Synthesizer.create(audioCtx, soundfontData);
+                console.log("Live preview soundfont loaded successfully!");
+                
+                // Set General MIDI program changes:
+                spessaSynth.programChange(0, 0);  // Piano
+                spessaSynth.programChange(1, 24); // Guitar (Nylon)
+                spessaSynth.programChange(2, 33); // Bass (Fingered)
+            } catch (e) {
+                console.error("Failed to initialize SpessaSynth soundfont preview:", e);
+            } finally {
+                isSynthLoading = false;
+            }
+        }
+
+        // Trigger loading on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { setTimeout(initSpessaSynth, 1500); });
+        } else {
+            setTimeout(initSpessaSynth, 1500);
+        }
+
+        // Also trigger on first interaction to allow resuming AudioContext
+        const triggerInteractionInit = () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            initSpessaSynth();
+        };
+        window.addEventListener('click', triggerInteractionInit, { once: true });
+        window.addEventListener('keydown', triggerInteractionInit, { once: true });
+
         // Play Synth Tone via AudioContext
         function playSynthNote(pitch, duration = 0.5, instrumentName = 'piano') {
             try {
@@ -1420,6 +1476,28 @@
                 }
                 
                 const inst = (instrumentName || '').toLowerCase();
+                
+                // Use SpessaSynth if loaded to strictly use MS Basic.sf3 soundfont
+                if (spessaSynth) {
+                    let channel = 0;
+                    if (inst.includes('drum') || inst.includes('perc') || inst.includes('rit') || inst.includes('beat')) {
+                        channel = 9; // Drums channel
+                    } else if (inst.includes('guitar')) {
+                        channel = 1;
+                    } else if (inst.includes('bass')) {
+                        channel = 2;
+                    }
+                    
+                    const velocity = Math.round(100 * volSynth);
+                    spessaSynth.noteOn(channel, pitch, velocity);
+                    
+                    setTimeout(() => {
+                        if (spessaSynth) {
+                            spessaSynth.noteOff(channel, pitch);
+                        }
+                    }, duration * 1000);
+                    return;
+                }
                 
                 // 1. Drum / Percussion synthesis
                 if (inst.includes('drum') || inst.includes('perc') || inst.includes('rit') || inst.includes('beat')) {
