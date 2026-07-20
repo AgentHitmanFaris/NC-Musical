@@ -415,8 +415,7 @@ def main():
                 # Use local temp folder inside the current directory
                 temp_dir = os.path.join(current_dir, ".temp")
                 os.makedirs(temp_dir, exist_ok=True)
-
-                # Step 1: Download from YouTube — cookieless-first, cookies as fallback
+                # Step 1: Download from YouTube — try standard yt-dlp first, then client fallbacks, then cookies
                 yield f"data: {json.dumps({'type': 'status_update', 'message': 'Downloading YouTube audio track...'})}\n\n"
 
                 cookie_candidates = [
@@ -424,19 +423,6 @@ def main():
                     os.path.join(current_dir, ".temp", "cookies.txt"),
                 ]
                 cookie_file = next((cp for cp in cookie_candidates if os.path.exists(cp)), None)
-
-                # Cookieless strategies ordered by bot-bypass reliability
-                cookieless_strategies = [
-                    ['tv_embedded'],
-                    ['android'],
-                    ['android_vr'],
-                    ['ios'],
-                    ['tv_embedded', 'android'],
-                    ['android', 'ios'],
-                    ['mweb'],
-                    ['web_embedded'],
-                    ['web', 'android'],
-                ]
 
                 base_opts = {
                     'format': 'bestaudio/best',
@@ -446,14 +432,23 @@ def main():
                     'noplaylist': True,
                 }
 
+                strategies = [
+                    ("Standard yt-dlp", {}),
+                    ("Android + Web client", {'extractor_args': {'youtube': {'player_client': ['android', 'web']}}}),
+                    ("iOS + Mobile Web client", {'extractor_args': {'youtube': {'player_client': ['ios', 'mweb']}}}),
+                ]
+
+                if cookie_file:
+                    strategies.append(("Standard yt-dlp + Cookies", {'cookiefile': cookie_file}))
+                    strategies.append(("Android client + Cookies", {'cookiefile': cookie_file, 'extractor_args': {'youtube': {'player_client': ['android', 'web']}}}))
+
                 download_err = None
                 temp_audio_path = None
 
-                # Phase 1: try all cookieless strategies
-                for clients in cookieless_strategies:
-                    opts = {**base_opts, 'extractor_args': {'youtube': {'player_client': clients}}}
+                for name, extra_opts in strategies:
+                    opts = {**base_opts, **extra_opts}
                     try:
-                        print(f"Trying player_client={clients} (no cookies)...")
+                        print(f"Attempting YouTube download using {name}...")
                         with yt_dlp.YoutubeDL(opts) as ydl:
                             info = ydl.extract_info(url, download=True)
                             candidate = ydl.prepare_filename(info)
@@ -462,34 +457,14 @@ def main():
                                 download_err = None
                                 break
                     except Exception as ex:
+                        print(f"Download attempt '{name}' failed: {ex}")
                         download_err = ex
-
-                # Phase 2: try with cookies if cookieless all failed
-                if not temp_audio_path and cookie_file:
-                    print(f"Cookieless attempts failed. Retrying with cookies: {cookie_file}")
-                    yield f"data: {json.dumps({'type': 'status_update', 'message': 'Retrying with cookies....'})}\n\n"
-                    for clients in [['tv_embedded'], ['android'], ['web']]:
-                        opts = {**base_opts,
-                                'extractor_args': {'youtube': {'player_client': clients}},
-                                'cookiefile': cookie_file}
-                        try:
-                            print(f"Trying player_client={clients} + cookies...")
-                            with yt_dlp.YoutubeDL(opts) as ydl:
-                                info = ydl.extract_info(url, download=True)
-                                candidate = ydl.prepare_filename(info)
-                                if candidate and os.path.exists(candidate):
-                                    temp_audio_path = candidate
-                                    download_err = None
-                                    break
-                        except Exception as ex:
-                            download_err = ex
 
                 if not temp_audio_path or not os.path.exists(temp_audio_path):
                     msg = (f"YouTube download failed: {download_err}. "
                            "Place a cookies.txt in the project folder or upload an audio file directly.")
                     yield f"data: {json.dumps({'type': 'status_update', 'message': msg})}\n\n"
                     return
-
                 
                 # Step 2: Convert to WAV using FFmpeg
                 yield f"data: {json.dumps({'type': 'status_update', 'message': 'Converting audio track to WAV...'})}\n\n"
