@@ -41,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run the MuScriptor GUI Server")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Bind address")
     parser.add_argument("--port", type=int, default=8222, help="Port to listen on")
-    parser.add_argument("--model", type=str, default="large", help="Model size: 'small', 'medium', or 'large'")
+    parser.add_argument("--model", type=str, default="medium", help="Model size: 'small', 'medium', or 'large'")
     parser.add_argument("--device", type=str, default="cuda", help="Torch device: 'cuda', 'cpu', or 'auto'")
     parser.add_argument("--share", action="store_true", help="Launch a public Gradio share link (gradio.live)")
     args = parser.parse_args()
