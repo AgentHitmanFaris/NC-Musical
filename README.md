@@ -63,11 +63,11 @@ Then open your browser and navigate to: `http://127.0.0.1:8222/index.html`
 * **Undo/Redo Stack:** Full 50-step state history with `Ctrl + Z` and `Ctrl + Y` support.
 * **Smart Auto-Follow:** Viewport smoothly pans during real-time playback or live AI transcription to keep the active playhead centered.
 
-### Multi-Instrument SF3 SoundFont Synthesis
-* **SpessaSynth SF3 Integration:** Integrated Web Audio API synthesizer utilizing `MS Basic.sf3` for multi-instrument sound reproduction (Piano, Nylon Guitar, Fingered Bass, Drums).
-* **AudioWorklet Architecture:** Multi-threaded Web Audio processing prevents UI thread stuttering during note preview.
+### Multi-Instrument MS Basic.sf3 SoundFont Synthesis
+* **SpessaSynth SF3 Integration:** Integrated SoundFont engine powered by SpessaSynth v4 and `MS Basic.sf3` for multi-instrument playback (Piano, Nylon Guitar, Fingered Bass, Drums).
+* **AudioWorklet Architecture:** Multi-threaded Web Audio SoundFont processing prevents UI thread stuttering during note preview.
 * **Solo & Mute Channels:** Granular per-track controls to solo or mute specific instruments during real-time MIDI playback.
-* **Fallback Web Synth:** Synthetic oscillator fallback for quick preview if SoundFont loading is bypassed.
+* **Fallback Oscillator Synth:** Backup Web Audio oscillator synthesis when SoundFont file is uninitialized.
 
 ### Session & Project Management
 * **Native OS File Save Dialogs:** Saves project JSON files and MIDI exports via a backend endpoint (`/save_file`), triggering native Windows File Save dialogs.
