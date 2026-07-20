@@ -10,361 +10,214 @@
   <style>
     :root {
       --bg-base: #07080c;
-      --bg-surface: rgba(20, 22, 32, 0.8);
-      --bg-card: rgba(30, 32, 47, 0.5);
-      --border-glow: rgba(99, 102, 241, 0.2);
-      --border-hover: rgba(99, 102, 241, 0.5);
+      --bg-surface: rgba(20,22,32,0.85);
+      --bg-card: rgba(30,32,47,0.5);
+      --border-glow: rgba(99,102,241,0.2);
+      --border-hover: rgba(99,102,241,0.55);
       --primary: #6366f1;
-      --primary-glow: rgba(99, 102, 241, 0.35);
+      --primary-glow: rgba(99,102,241,0.35);
       --secondary: #a855f7;
       --accent: #06b6d4;
       --success: #10b981;
       --danger: #ef4444;
       --text-main: #f3f4f6;
       --text-muted: #9ca3af;
-      --font-main: 'Outfit', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --font: 'Outfit', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background: var(--bg-base);
       color: var(--text-main);
-      font-family: var(--font-main);
+      font-family: var(--font);
       height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      user-select: none;
       -webkit-app-region: drag;
     }
-
-    /* Ambient glow orbs */
     body::before {
-      content: '';
-      position: fixed;
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
-      top: -100px; left: -100px;
-      pointer-events: none;
+      content:''; position:fixed;
+      width:400px; height:400px;
+      background:radial-gradient(circle,rgba(99,102,241,.12) 0%,transparent 70%);
+      top:-100px; left:-100px; pointer-events:none;
     }
     body::after {
-      content: '';
-      position: fixed;
-      width: 350px; height: 350px;
-      background: radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%);
-      bottom: -80px; right: -80px;
-      pointer-events: none;
+      content:''; position:fixed;
+      width:350px; height:350px;
+      background:radial-gradient(circle,rgba(168,85,247,.1) 0%,transparent 70%);
+      bottom:-80px; right:-80px; pointer-events:none;
     }
-
     .wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2rem;
-      width: 100%;
-      max-width: 700px;
-      padding: 2rem 1.5rem;
-      -webkit-app-region: no-drag;
+      display:flex; flex-direction:column; align-items:center;
+      gap:1.5rem; width:100%; max-width:710px; padding:1.5rem;
+      -webkit-app-region:no-drag;
     }
-
-    /* Header */
-    .header {
-      text-align: center;
-    }
+    .header { text-align:center; }
     .logo {
-      font-size: 2rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f3f4f6 20%, #6366f1 60%, #a855f7 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-bottom: 0.35rem;
+      font-size:1.9rem; font-weight:700;
+      background:linear-gradient(135deg,#f3f4f6 20%,#6366f1 60%,#a855f7 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      display:flex; align-items:center; justify-content:center;
+      gap:.5rem; margin-bottom:.3rem;
     }
-    .logo-icon { font-size: 1.8rem; -webkit-text-fill-color: initial; }
-    .subtitle {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
+    .logo-icon { font-size:1.7rem; -webkit-text-fill-color:initial; }
+    .subtitle { font-size:.85rem; color:var(--text-muted); letter-spacing:.05em; }
+    .divider { font-size:.72rem; color:rgba(156,163,175,.4); letter-spacing:.08em; text-transform:uppercase; }
 
-    /* Cards row */
-    .cards {
-      display: flex;
-      gap: 1rem;
-      width: 100%;
-      align-items: flex-start;
-    }
+    .cards { display:flex; gap:1rem; width:100%; align-items:flex-start; }
 
     .card {
-      flex: 1;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-glow);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.25s ease;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
+      flex:1; background:var(--bg-surface);
+      border:1px solid var(--border-glow); border-radius:1rem;
+      padding:1.35rem; display:flex; flex-direction:column; gap:.85rem;
+      transition:border-color .3s,box-shadow .3s,transform .25s;
+      cursor:pointer; position:relative; overflow:hidden;
     }
     .card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, transparent 60%, rgba(99,102,241,0.04));
-      pointer-events: none;
+      content:''; position:absolute; inset:0;
+      background:linear-gradient(135deg,transparent 60%,rgba(99,102,241,.04));
+      pointer-events:none;
     }
-    .card:hover {
-      border-color: var(--border-hover);
-      box-shadow: 0 0 30px rgba(99,102,241,0.12);
-      transform: translateY(-2px);
-    }
-    .card.selected {
-      border-color: var(--primary);
-      box-shadow: 0 0 40px rgba(99,102,241,0.2);
-    }
+    .card:hover { border-color:var(--border-hover); box-shadow:0 0 30px rgba(99,102,241,.12); transform:translateY(-2px); }
+    .card.selected { border-color:var(--primary); box-shadow:0 0 40px rgba(99,102,241,.2); }
 
-    .card-icon {
-      font-size: 2rem;
-      line-height: 1;
-    }
-    .card-title {
-      font-size: 1.15rem;
-      font-weight: 600;
-      color: var(--text-main);
-    }
-    .card-desc {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-    .card-bullets {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-    .card-bullets li {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .card-bullets li::before {
-      content: '›';
-      color: var(--primary);
-      font-weight: 700;
-      font-size: 1rem;
-    }
+    .card-icon { font-size:1.8rem; line-height:1; }
+    .card-title { font-size:1.1rem; font-weight:600; }
+    .card-desc { font-size:.8rem; color:var(--text-muted); line-height:1.5; }
+    .bullets { list-style:none; display:flex; flex-direction:column; gap:.35rem; }
+    .bullets li { font-size:.78rem; color:var(--text-muted); display:flex; align-items:center; gap:.45rem; }
+    .bullets li::before { content:'›'; color:var(--primary); font-weight:700; font-size:.95rem; }
 
     /* Buttons */
     .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 0.6rem 1rem;
-      border-radius: 0.45rem;
-      font-family: var(--font-main);
-      font-size: 0.88rem;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      width: 100%;
+      display:flex; align-items:center; justify-content:center;
+      gap:.4rem; padding:.58rem 1rem; border-radius:.4rem;
+      font-family:var(--font); font-size:.85rem; font-weight:600;
+      border:none; cursor:pointer; transition:all .25s ease; width:100%;
     }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      color: white;
-      box-shadow: 0 2px 12px var(--primary-glow);
-    }
-    .btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(99,102,241,0.45);
-    }
-    .btn-outline {
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid rgba(6,182,212,0.35);
-    }
-    .btn-outline:hover {
-      background: rgba(6,182,212,0.07);
-      border-color: var(--accent);
-    }
-    .btn-success {
-      background: linear-gradient(135deg, #059669, #10b981);
-      color: white;
-      box-shadow: 0 2px 12px rgba(16,185,129,0.25);
-    }
-    .btn-success:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(16,185,129,0.4);
-    }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-    }
+    .btn-primary { background:linear-gradient(135deg,var(--primary),var(--secondary)); color:#fff; box-shadow:0 2px 12px var(--primary-glow); }
+    .btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 20px rgba(99,102,241,.45); }
+    .btn-success { background:linear-gradient(135deg,#059669,#10b981); color:#fff; box-shadow:0 2px 12px rgba(16,185,129,.25); }
+    .btn-success:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 4px 20px rgba(16,185,129,.4); }
+    .btn-outline { background:transparent; color:var(--accent); border:1px solid rgba(6,182,212,.35); }
+    .btn-outline:hover { background:rgba(6,182,212,.07); border-color:var(--accent); }
+    .btn:disabled { opacity:.5; cursor:not-allowed; transform:none !important; }
 
     /* Cloud steps */
     .cloud-steps {
-      display: none;
-      flex-direction: column;
-      gap: 0.75rem;
-      animation: slide-down 0.3s ease;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      padding-top: 1rem;
+      display:none; flex-direction:column; gap:.7rem;
+      animation:slide-down .3s ease;
+      border-top:1px solid rgba(255,255,255,.06);
+      padding-top:.85rem;
     }
-    .cloud-steps.visible { display: flex; }
+    .cloud-steps.visible { display:flex; }
+    @keyframes slide-down { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
 
-    @keyframes slide-down {
-      from { opacity: 0; transform: translateY(-8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .step {
-      display: flex;
-      gap: 0.65rem;
-      align-items: flex-start;
-    }
+    .step { display:flex; gap:.6rem; align-items:flex-start; }
     .step-num {
-      min-width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: rgba(99,102,241,0.15);
-      border: 1px solid rgba(99,102,241,0.35);
-      color: var(--primary);
-      font-size: 0.72rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 1px;
+      min-width:22px; height:22px; border-radius:50%;
+      background:rgba(99,102,241,.12); border:1px solid rgba(99,102,241,.3);
+      color:var(--primary); font-size:.7rem; font-weight:700;
+      display:flex; align-items:center; justify-content:center; margin-top:1px; flex-shrink:0;
     }
-    .step-text {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
+    .step-num.done { background:rgba(16,185,129,.15); border-color:rgba(16,185,129,.4); color:var(--success); }
+    .step-text { font-size:.79rem; color:var(--text-muted); line-height:1.45; }
 
-    /* URL input */
-    .url-row {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 0.25rem;
+    /* Source tabs */
+    .source-tabs {
+      display:flex; gap:.35rem;
+      background:rgba(255,255,255,.03); padding:.2rem;
+      border-radius:.4rem; border:1px solid rgba(255,255,255,.05);
     }
+    .tab {
+      flex:1; background:transparent; border:none;
+      color:var(--text-muted); font-family:var(--font);
+      font-size:.78rem; font-weight:500; padding:.35rem .5rem;
+      border-radius:.3rem; cursor:pointer; transition:all .2s;
+    }
+    .tab.active { background:rgba(99,102,241,.2); color:#fff; }
+
+    /* Inputs */
     .url-input {
-      flex: 1;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 0.4rem;
-      color: var(--text-main);
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      padding: 0.5rem 0.65rem;
-      outline: none;
-      transition: border-color 0.2s;
+      width:100%; background:rgba(0,0,0,.3);
+      border:1px solid rgba(255,255,255,.1); border-radius:.4rem;
+      color:var(--text-main); font-family:var(--mono); font-size:.72rem;
+      padding:.5rem .65rem; outline:none; transition:border-color .2s;
     }
-    .url-input::placeholder { color: rgba(156,163,175,0.5); }
-    .url-input:focus { border-color: var(--primary); }
-    .url-input.error { border-color: var(--danger); }
-    .url-input.ok { border-color: var(--success); }
+    .url-input::placeholder { color:rgba(156,163,175,.45); }
+    .url-input:focus { border-color:var(--primary); }
+    .url-input.error { border-color:var(--danger); }
+    .url-input.ok { border-color:var(--success); }
 
-    /* Status messages */
+    /* File pick row */
+    .file-row { display:flex; gap:.5rem; align-items:center; }
+    .file-btn {
+      flex-shrink:0; padding:.48rem .75rem; border-radius:.4rem;
+      background:rgba(6,182,212,.1); border:1px solid rgba(6,182,212,.3);
+      color:var(--accent); font-family:var(--font); font-size:.78rem;
+      font-weight:500; cursor:pointer; transition:all .2s; white-space:nowrap;
+    }
+    .file-btn:hover { background:rgba(6,182,212,.18); border-color:var(--accent); }
+    .file-name { font-family:var(--mono); font-size:.7rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* Status */
     .status-msg {
-      font-size: 0.78rem;
-      padding: 0.45rem 0.7rem;
-      border-radius: 0.4rem;
-      display: none;
-      align-items: center;
-      gap: 0.4rem;
+      font-size:.77rem; padding:.42rem .65rem; border-radius:.4rem;
+      display:none; align-items:center; gap:.4rem;
     }
-    .status-msg.visible { display: flex; }
-    .status-msg.loading {
-      background: rgba(99,102,241,0.08);
-      border: 1px solid rgba(99,102,241,0.2);
-      color: var(--primary);
-    }
-    .status-msg.error {
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.2);
-      color: #fca5a5;
-    }
-    .status-msg.success {
-      background: rgba(16,185,129,0.08);
-      border: 1px solid rgba(16,185,129,0.2);
-      color: #6ee7b7;
-    }
+    .status-msg.visible { display:flex; }
+    .status-msg.loading { background:rgba(99,102,241,.08); border:1px solid rgba(99,102,241,.2); color:#a5b4fc; }
+    .status-msg.error { background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); color:#fca5a5; }
+    .status-msg.success { background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.2); color:#6ee7b7; }
 
-    /* Spinner */
-    .spinner {
-      width: 14px; height: 14px;
-      border: 2px solid rgba(99,102,241,0.2);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
+    .spinner { width:13px; height:13px; border:2px solid rgba(99,102,241,.2); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; flex-shrink:0; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* Results panel */
+    .results-panel {
+      display:none; flex-direction:column; gap:.6rem;
+      border-top:1px solid rgba(255,255,255,.06); padding-top:.8rem;
+      animation:slide-down .4s ease;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .results-panel.visible { display:flex; }
+    .result-title { font-size:.82rem; font-weight:600; color:var(--success); display:flex; align-items:center; gap:.4rem; }
+    .dl-btn {
+      display:flex; align-items:center; gap:.5rem;
+      padding:.45rem .75rem; border-radius:.4rem;
+      border:1px solid rgba(16,185,129,.3);
+      background:rgba(16,185,129,.08); color:#6ee7b7;
+      font-family:var(--font); font-size:.78rem; cursor:pointer; transition:all .2s;
+      text-decoration:none;
+    }
+    .dl-btn:hover { background:rgba(16,185,129,.15); border-color:var(--success); }
 
     /* Loading overlay */
     .loading-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(7,8,12,0.92);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1.25rem;
-      z-index: 100;
-      backdrop-filter: blur(8px);
+      position:fixed; inset:0; background:rgba(7,8,12,.93);
+      display:none; flex-direction:column; align-items:center;
+      justify-content:center; gap:1.2rem; z-index:100; backdrop-filter:blur(8px);
     }
-    .loading-overlay.visible { display: flex; }
-    .loading-big-spinner {
-      width: 52px; height: 52px;
-      border: 3px solid rgba(99,102,241,0.15);
-      border-top-color: var(--primary);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    .loading-overlay h3 { font-size: 1.1rem; font-weight: 600; }
-    .loading-overlay p { font-size: 0.82rem; color: var(--text-muted); text-align: center; max-width: 320px; }
-
-    /* Divider text */
-    .divider {
-      font-size: 0.75rem;
-      color: rgba(156,163,175,0.4);
-      text-align: center;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
+    .loading-overlay.visible { display:flex; }
+    .big-spinner { width:50px; height:50px; border:3px solid rgba(99,102,241,.15); border-top-color:var(--primary); border-radius:50%; animation:spin 1s linear infinite; }
+    .loading-overlay h3 { font-size:1.05rem; font-weight:600; }
+    .loading-overlay p { font-size:.8rem; color:var(--text-muted); text-align:center; max-width:310px; line-height:1.5; }
+    .progress-bar-wrap { width:240px; height:6px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; }
+    .progress-bar-fill { height:100%; background:linear-gradient(90deg,var(--primary),var(--accent)); border-radius:99px; transition:width .4s ease; width:0%; }
   </style>
 </head>
 <body>
 
 <div class="wrapper">
-  <!-- Header -->
   <div class="header">
-    <div class="logo">
-      <span class="logo-icon">🎵</span> NC-Musical
-    </div>
+    <div class="logo"><span class="logo-icon">🎵</span> NC-Musical</div>
     <div class="subtitle">AI Music Transcription Engine</div>
   </div>
 
   <div class="divider">Choose your compute mode</div>
 
-  <!-- Cards -->
   <div class="cards">
 
     <!-- LOCAL CARD -->
@@ -374,18 +227,17 @@
         <div class="card-title">Run Locally</div>
         <div class="card-desc">Use your own machine's GPU or CPU</div>
       </div>
-      <ul class="card-bullets">
+      <ul class="bullets">
         <li>Works completely offline</li>
-        <li>Private — no data leaves device</li>
+        <li>Private — data stays on device</li>
         <li>Medium model by default</li>
-        <li>Speed depends on your hardware</li>
+        <li>Speed depends on hardware</li>
       </ul>
-      <button class="btn btn-primary" id="local-btn" onclick="event.stopPropagation(); launchLocal()">
-        ⚡ Launch Locally
-      </button>
+      <button class="btn btn-primary" id="local-btn"
+        onclick="event.stopPropagation(); launchLocal()">⚡ Launch Locally</button>
       <div class="status-msg loading" id="local-status">
         <div class="spinner"></div>
-        <span id="local-status-text">Starting server, loading AI model…</span>
+        <span id="local-status-text">Loading AI model — please wait…</span>
       </div>
     </div>
 
@@ -394,70 +246,110 @@
       <div class="card-icon">☁️</div>
       <div>
         <div class="card-title">Run on Cloud</div>
-        <div class="card-desc">Use Google Colab's free T4 / A100 GPU</div>
+        <div class="card-desc">Use Google Colab's free GPU — identical UI</div>
       </div>
-      <ul class="card-bullets">
-        <li>Free high-end GPU from Google</li>
+      <ul class="bullets">
+        <li>Free T4 / A100 GPU from Google</li>
         <li>Large model — maximum accuracy</li>
         <li>Requires internet connection</li>
-        <li>Identical UI — runs transparently</li>
+        <li>Results delivered to this app</li>
       </ul>
 
-      <!-- Steps (shown after clicking the card) -->
       <div class="cloud-steps" id="cloud-steps">
+
+        <!-- Step 1 — automatic -->
         <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-text">Open the Colab notebook and sign in to Google</div>
+          <div class="step-num done" id="step1-num">✓</div>
+          <div class="step-text" id="step1-text">Opening Colab in your browser…</div>
         </div>
-        <button class="btn btn-outline" id="open-colab-btn" onclick="event.stopPropagation(); openColab()">
-          🔗 Open Colab Notebook
-        </button>
+
+        <!-- Step 2 -->
         <div class="step">
           <div class="step-num">2</div>
-          <div class="step-text">In Colab, run <strong>Cells 1 → 5</strong> (setup + launch web server)</div>
+          <div class="step-text">In Colab: <strong>Runtime → Run all</strong> and wait for all cells to finish</div>
         </div>
+
+        <!-- Step 3 -->
         <div class="step">
           <div class="step-num">3</div>
-          <div class="step-text">Copy the <strong>Connect URL</strong> printed by Cell 5</div>
+          <div class="step-text">Copy the <strong style="color:#a5f3fc">Connect URL</strong> printed in the output</div>
         </div>
+
+        <!-- Step 4 — URL + audio source -->
         <div class="step">
           <div class="step-num">4</div>
-          <div class="step-text">Paste it below and click Connect</div>
+          <div class="step-text">Paste the URL, pick your audio source, then click <strong>Transcribe</strong></div>
         </div>
-        <div class="url-row">
-          <input
-            class="url-input"
-            id="cloud-url-input"
-            type="text"
-            placeholder="https://xxxx.trycloudflare.com"
+
+        <!-- Connect URL -->
+        <input class="url-input" id="cloud-url-input" type="text"
+          placeholder="https://xxxx.trycloudflare.com"
+          onclick="event.stopPropagation()"
+          oninput="clearSourceStatus()"/>
+
+        <!-- Audio source tabs -->
+        <div class="source-tabs" onclick="event.stopPropagation()">
+          <button class="tab active" id="tab-yt" onclick="switchTab('yt')">🎬 YouTube URL</button>
+          <button class="tab" id="tab-file" onclick="switchTab('file')">📁 Upload File</button>
+        </div>
+
+        <!-- YouTube source -->
+        <div id="source-yt">
+          <input class="url-input" id="yt-url-input" type="text"
+            placeholder="https://www.youtube.com/watch?v=..."
             onclick="event.stopPropagation()"
-            onkeydown="if(event.key==='Enter') launchCloud()"
-          />
+            onkeydown="if(event.key==='Enter') connectAndTranscribe()"/>
         </div>
-        <button class="btn btn-success" id="cloud-btn" onclick="event.stopPropagation(); launchCloud()">
-          ☁️ Connect to Cloud
+
+        <!-- File source -->
+        <div id="source-file" style="display:none">
+          <div class="file-row" onclick="event.stopPropagation()">
+            <button class="file-btn" onclick="browseFile()">📂 Browse…</button>
+            <span class="file-name" id="file-name">No file selected</span>
+          </div>
+        </div>
+
+        <!-- Transcribe button -->
+        <button class="btn btn-success" id="cloud-btn"
+          onclick="event.stopPropagation(); connectAndTranscribe()">
+          ☁️ Connect &amp; Transcribe
         </button>
+
+        <!-- Status -->
         <div class="status-msg" id="cloud-status">
           <div class="spinner" id="cloud-spinner"></div>
           <span id="cloud-status-text"></span>
         </div>
-      </div>
-    </div>
 
-  </div>
-</div>
+        <!-- Results -->
+        <div class="results-panel" id="results-panel">
+          <div class="result-title">✅ Transcription complete!</div>
+          <a class="dl-btn" id="dl-midi" href="#" download>⬇️ Download MIDI</a>
+          <a class="dl-btn" id="dl-chords" href="#" download style="display:none">📄 Download Chord Sheet</a>
+          <button class="btn btn-outline" style="margin-top:.25rem"
+            onclick="event.stopPropagation(); openFullEditor()">🎹 Open Full Piano Roll Editor</button>
+        </div>
+
+      </div><!-- /cloud-steps -->
+    </div><!-- /cloud-card -->
+
+  </div><!-- /cards -->
+</div><!-- /wrapper -->
 
 <!-- Loading overlay for local boot -->
 <div class="loading-overlay" id="loading-overlay">
-  <div class="loading-big-spinner"></div>
+  <div class="big-spinner"></div>
   <h3>Starting NC-Musical…</h3>
   <p id="loading-msg">Loading the AI transcription model. This may take 1–2 minutes on first run.</p>
+  <div class="progress-bar-wrap"><div class="progress-bar-fill" id="local-progress"></div></div>
 </div>
 
 <script>
-  let cloudSelected = false;
+  let currentTab = 'yt';
+  let selectedFilePath = null;
+  let connectedCloudUrl = null;
 
-  // ── Init: prefill last used cloud URL ───────────────────────────────────────
+  // ── Init ─────────────────────────────────────────────────────────────────────
   function waitForApi(cb) {
     if (window.pywebview && window.pywebview.api) cb();
     else setTimeout(() => waitForApi(cb), 80);
@@ -465,9 +357,7 @@
 
   waitForApi(() => {
     window.pywebview.api.get_last_url().then(url => {
-      if (url) {
-        document.getElementById('cloud-url-input').value = url;
-      }
+      if (url) document.getElementById('cloud-url-input').value = url;
     });
   });
 
@@ -476,83 +366,166 @@
     document.getElementById('local-card').classList.add('selected');
     document.getElementById('cloud-card').classList.remove('selected');
     document.getElementById('cloud-steps').classList.remove('visible');
-    cloudSelected = false;
   }
 
   function selectCloud() {
+    if (document.getElementById('cloud-steps').classList.contains('visible')) return;
     document.getElementById('cloud-card').classList.add('selected');
     document.getElementById('local-card').classList.remove('selected');
     document.getElementById('cloud-steps').classList.add('visible');
-    cloudSelected = true;
-  }
 
-  // ── Launch Local ─────────────────────────────────────────────────────────────
-  function launchLocal() {
-    const btn = document.getElementById('local-btn');
-    const status = document.getElementById('local-status');
-    btn.disabled = true;
-    btn.textContent = 'Starting…';
-    status.classList.add('visible', 'loading');
-    document.getElementById('loading-overlay').classList.add('visible');
-
+    // Auto-open Colab immediately
     waitForApi(() => {
-      window.pywebview.api.launch_local().then(result => {
-        if (!result.ok) {
-          document.getElementById('loading-overlay').classList.remove('visible');
-          document.getElementById('local-status-text').textContent = result.error || 'Failed to start server.';
-          status.classList.remove('loading');
-          status.classList.add('error');
-          btn.disabled = false;
-          btn.innerHTML = '⚡ Launch Locally';
-        }
-        // On success the Python side navigates the window automatically
+      window.pywebview.api.open_colab().then(() => {
+        document.getElementById('step1-text').textContent = '✓ Colab opened in your browser. Sign in to Google if prompted.';
       });
     });
   }
 
-  // ── Open Colab ───────────────────────────────────────────────────────────────
-  function openColab() {
-    waitForApi(() => window.pywebview.api.open_colab());
+  // ── Tab switch ───────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('source-yt').style.display = tab === 'yt' ? 'block' : 'none';
+    document.getElementById('source-file').style.display = tab === 'file' ? 'block' : 'none';
+    document.getElementById('tab-yt').className = 'tab' + (tab === 'yt' ? ' active' : '');
+    document.getElementById('tab-file').className = 'tab' + (tab === 'file' ? ' active' : '');
   }
 
-  // ── Launch Cloud ─────────────────────────────────────────────────────────────
-  function launchCloud() {
-    const url = document.getElementById('cloud-url-input').value.trim();
-    const input = document.getElementById('cloud-url-input');
+  // ── Browse file ──────────────────────────────────────────────────────────────
+  function browseFile() {
+    waitForApi(() => {
+      window.pywebview.api.browse_file().then(result => {
+        if (result && result.path) {
+          selectedFilePath = result.path;
+          document.getElementById('file-name').textContent = result.name;
+        }
+      });
+    });
+  }
+
+  function clearSourceStatus() {
+    document.getElementById('cloud-url-input').classList.remove('error', 'ok');
+    document.getElementById('cloud-status').className = 'status-msg';
+  }
+
+  // ── Connect & Transcribe ─────────────────────────────────────────────────────
+  function connectAndTranscribe() {
+    const colabUrl = document.getElementById('cloud-url-input').value.trim();
+    const urlInput = document.getElementById('cloud-url-input');
     const btn = document.getElementById('cloud-btn');
     const status = document.getElementById('cloud-status');
     const statusText = document.getElementById('cloud-status-text');
     const spinner = document.getElementById('cloud-spinner');
 
-    if (!url) {
-      input.classList.add('error');
-      setTimeout(() => input.classList.remove('error'), 1500);
+    if (!colabUrl) {
+      urlInput.classList.add('error');
+      showStatus('error', 'Paste the Connect URL from Colab first.');
       return;
     }
 
-    input.classList.remove('error', 'ok');
+    const ytUrl = currentTab === 'yt' ? document.getElementById('yt-url-input').value.trim() : '';
+    if (currentTab === 'yt' && !ytUrl) {
+      showStatus('error', 'Enter a YouTube URL.');
+      return;
+    }
+    if (currentTab === 'file' && !selectedFilePath) {
+      showStatus('error', 'Select an audio file first.');
+      return;
+    }
+
     btn.disabled = true;
     btn.textContent = 'Connecting…';
-    status.className = 'status-msg loading visible';
-    spinner.style.display = 'block';
-    statusText.textContent = 'Verifying connection to Colab…';
+    showStatus('loading', 'Verifying Colab connection…');
 
     waitForApi(() => {
-      window.pywebview.api.launch_cloud(url).then(result => {
-        if (result.ok) {
-          input.classList.add('ok');
-          status.className = 'status-msg success visible';
-          spinner.style.display = 'none';
-          statusText.textContent = '✓ Connected! Opening Piano Roll…';
-          // Python side navigates automatically
-        } else {
-          input.classList.add('error');
-          status.className = 'status-msg error visible';
-          spinner.style.display = 'none';
-          statusText.textContent = result.error || 'Could not connect. Check the URL and try again.';
+      const payload = {
+        colab_url: colabUrl,
+        youtube_url: currentTab === 'yt' ? ytUrl : null,
+        file_path: currentTab === 'file' ? selectedFilePath : null,
+      };
+      window.pywebview.api.connect_and_transcribe(payload).then(result => {
+        if (!result.ok) {
+          urlInput.classList.add('error');
+          showStatus('error', result.error || 'Connection failed. Check the URL.');
           btn.disabled = false;
-          btn.innerHTML = '☁️ Connect to Cloud';
+          btn.innerHTML = '☁️ Connect &amp; Transcribe';
         }
+        // On success, Python side pushes status updates via evaluate_js
+      });
+    });
+  }
+
+  // Called from Python to update progress
+  function updateCloudStatus(type, msg, pct) {
+    if (type === 'success') {
+      showStatus('success', msg);
+    } else if (type === 'error') {
+      showStatus('error', msg);
+      document.getElementById('cloud-btn').disabled = false;
+      document.getElementById('cloud-btn').innerHTML = '☁️ Connect &amp; Transcribe';
+    } else {
+      showStatus('loading', msg);
+    }
+  }
+
+  function showResults(midiDataUrl, chordsText) {
+    document.getElementById('results-panel').classList.add('visible');
+    const dlMidi = document.getElementById('dl-midi');
+    dlMidi.href = midiDataUrl;
+    dlMidi.download = 'transcription.mid';
+
+    if (chordsText) {
+      const blob = new Blob([chordsText], { type: 'text/plain' });
+      const dlChords = document.getElementById('dl-chords');
+      dlChords.href = URL.createObjectURL(blob);
+      dlChords.download = 'chords.txt';
+      dlChords.style.display = 'flex';
+    }
+
+    showStatus('success', '✅ Done! Download your files below.');
+    document.getElementById('cloud-btn').disabled = false;
+    document.getElementById('cloud-btn').innerHTML = '☁️ Transcribe Again';
+  }
+
+  function openFullEditor() {
+    if (connectedCloudUrl) {
+      waitForApi(() => window.pywebview.api.open_piano_roll(connectedCloudUrl));
+    }
+  }
+
+  function showStatus(type, msg) {
+    const s = document.getElementById('cloud-status');
+    const spinner = document.getElementById('cloud-spinner');
+    s.className = 'status-msg ' + type + ' visible';
+    spinner.style.display = type === 'loading' ? 'block' : 'none';
+    document.getElementById('cloud-status-text').textContent = msg;
+  }
+
+  // ── Launch Local ─────────────────────────────────────────────────────────────
+  function launchLocal() {
+    const btn = document.getElementById('local-btn');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    document.getElementById('local-status').classList.add('visible');
+    document.getElementById('loading-overlay').classList.add('visible');
+
+    let pct = 0;
+    const progInterval = setInterval(() => {
+      pct = Math.min(pct + Math.random() * 3, 90);
+      document.getElementById('local-progress').style.width = pct + '%';
+    }, 800);
+
+    waitForApi(() => {
+      window.pywebview.api.launch_local().then(result => {
+        clearInterval(progInterval);
+        if (!result.ok) {
+          document.getElementById('loading-overlay').classList.remove('visible');
+          document.getElementById('local-status').className = 'status-msg error visible';
+          document.getElementById('local-status-text').textContent = result.error || 'Failed to start server.';
+          btn.disabled = false;
+          btn.innerHTML = '⚡ Launch Locally';
+        }
+        // On success Python navigates the window
       });
     });
   }

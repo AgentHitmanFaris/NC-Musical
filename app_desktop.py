@@ -6,6 +6,7 @@ import threading
 import time
 import socket
 import urllib.request
+import urllib.parse
 import urllib.error
 import webbrowser
 
@@ -98,7 +99,7 @@ def load_last_url():
 # ── Launcher JS API ───────────────────────────────────────────────────────────
 class LauncherApi:
     def __init__(self, window_ref):
-        self._window = window_ref  # list so we can set it after creation
+        self._window = window_ref
 
     @property
     def win(self):
@@ -111,19 +112,86 @@ class LauncherApi:
         webbrowser.open(COLAB_NOTEBOOK_URL)
         return True
 
-    def validate_cloud_url(self, url):
-        url = url.rstrip("/")
+    def browse_file(self):
+        file_types = ('Audio/Video Files (*.mp3;*.wav;*.mp4;*.m4a;*.flac;*.ogg)', 'All files (*.*)')
+        result = self.win.create_file_dialog(webview.OPEN_DIALOG, file_types=file_types)
+        if result and len(result) > 0:
+            file_path = result[0]
+            return {"path": file_path, "name": os.path.basename(file_path)}
+        return None
+
+    def open_piano_roll(self, cloud_url):
+        write_config_cloud(cloud_url)
+        self.win.resize(1380, 860)
+        self.win.load_url(f"{cloud_url}/index.html")
+        return True
+
+    def connect_and_transcribe(self, payload):
+        colab_url = payload.get("colab_url", "").rstrip("/")
+        youtube_url = payload.get("youtube_url")
+        file_path = payload.get("file_path")
+
+        # 1. Validate Colab connection first
         try:
             req = urllib.request.Request(
-                f"{url}/health",
+                f"{colab_url}/health",
                 headers={"User-Agent": "NC-Musical-Desktop/1.0"}
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
-                if resp.status == 200:
-                    return {"ok": True}
-                return {"ok": False, "error": f"Server returned HTTP {resp.status}"}
+                if resp.status != 200:
+                    return {"ok": False, "error": f"Colab server returned HTTP {resp.status}"}
         except Exception as e:
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": f"Cannot reach Colab at {colab_url}. Make sure Cells 1-4 are running."}
+
+        save_last_url(colab_url)
+
+        # 2. Trigger transcription in background thread
+        def run_remote_transcription():
+            try:
+                if youtube_url:
+                    self.win.evaluate_js(f"updateCloudStatus('loading', 'Downloading YouTube audio via Colab GPU...', 10);")
+                    params = urllib.parse.urlencode({"url": youtube_url, "model_size": "large"})
+                    endpoint = f"{colab_url}/transcribe_youtube?{params}"
+                    req = urllib.request.Request(endpoint, headers={"User-Agent": "NC-Musical-Desktop/1.0"})
+                    with urllib.request.urlopen(req) as resp:
+                        # SSE stream processing
+                        for line in resp:
+                            line_str = line.decode('utf-8').strip()
+                            if line_str.startswith("data: "):
+                                data_json = line_str[6:]
+                                try:
+                                    evt = json.loads(data_json)
+                                    msg = evt.get("message", "Processing...")
+                                    self.win.evaluate_js(f"updateCloudStatus('loading', {json.dumps(msg)}, 50);")
+                                except:
+                                    pass
+                elif file_path:
+                    self.win.evaluate_js(f"updateCloudStatus('loading', 'Uploading file to Colab GPU...', 20);")
+                    # multipart upload to colab /transcribe
+                    import requests
+                    with open(file_path, 'rb') as f:
+                        files = {'file': (os.path.basename(file_path), f)}
+                        data = {'model_size': 'large'}
+                        r = requests.post(f"{colab_url}/transcribe", files=files, data=data, stream=True)
+                        for chunk in r.iter_lines():
+                            if chunk:
+                                line_str = chunk.decode('utf-8').strip()
+                                if line_str.startswith("data: "):
+                                    try:
+                                        evt = json.loads(line_str[6:])
+                                        msg = evt.get("message", "Processing...")
+                                        self.win.evaluate_js(f"updateCloudStatus('loading', {json.dumps(msg)}, 50);")
+                                    except:
+                                        pass
+
+                self.win.evaluate_js(f"connectedCloudUrl = '{colab_url}';")
+                self.win.evaluate_js(f"showResults('{colab_url}/audio', null);")
+
+            except Exception as ex:
+                self.win.evaluate_js(f"updateCloudStatus('error', {json.dumps(str(ex))}, 0);")
+
+        threading.Thread(target=run_remote_transcription, daemon=True).start()
+        return {"ok": True}
 
     def launch_local(self):
         """Start local server_gui.py in background, navigate when ready."""
@@ -153,24 +221,11 @@ class LauncherApi:
         threading.Thread(target=navigate_when_ready, daemon=True).start()
         return {"ok": True, "message": "Starting server… loading AI model (may take 1–2 minutes)"}
 
-    def launch_cloud(self, url):
-        """Validate cloud URL and navigate the window to it."""
-        url = url.rstrip("/")
-        result = self.validate_cloud_url(url)
-        if result.get("ok"):
-            save_last_url(url)
-            write_config_cloud(url)
-            self.win.resize(1380, 860)
-            self.win.load_url(f"{url}/index.html")
-            return {"ok": True}
-        return result
-
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     launcher_path = os.path.join(project_dir, "launcher.html")
 
-    # window ref holder (mutable so LauncherApi can access it after creation)
     window_ref = [None]
     api = LauncherApi(window_ref)
 
@@ -178,7 +233,7 @@ if __name__ == "__main__":
         "NC-Musical — Select Mode",
         launcher_path,
         width=720,
-        height=580,
+        height=620,
         js_api=api,
         background_color="#07080c",
         resizable=False,
