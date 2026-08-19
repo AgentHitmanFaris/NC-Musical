@@ -25,9 +25,18 @@ def main():
         print(f"Error: Audio file not found: {audio_path}")
         sys.exit(1)
 
-    print("Checking CUDA device...")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+    print("Checking acceleration device (CUDA / TPU / CPU)...")
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+        print(f"Using CUDA GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        try:
+            import torch_xla.core.xla_model as xm
+            device = xm.xla_device()
+            print(f"Using Google TPU: {device}")
+        except Exception:
+            print("Using CPU device")
 
     # Ensure Hugging Face Token is set if needed for gated model
     if "HF_TOKEN" not in os.environ:

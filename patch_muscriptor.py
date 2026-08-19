@@ -67,9 +67,7 @@ def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
         )
     return soundfont_path"""
 
-    replacement_aur = """# Point local soundfont to workspace root's MS Basic.sf3
-_WORKSPACE_DIR = Path(__file__).parent.parent.parent.parent.parent.parent
-_LOCAL_SOUNDFONT = _WORKSPACE_DIR / "MS Basic.sf3"
+    replacement_aur = """# Point local soundfont to Google Colab / local paths for MS Basic.sf3
 _SAMPLE_RATE = 44100
 
 
@@ -80,82 +78,24 @@ def _load_mono_44k(path: Path) -> np.ndarray:
 
 
 def _resolve_soundfont(soundfont_path: str | Path | None) -> Path:
-    # Prepend dynamic fluidsynth binary directory to system PATH if on Windows
-    fs_bin = r"D:\\Document\\NC-Project\\sheetsage\\AtoScore_Core\\bin"
-    if os.name == "nt" and fs_bin not in os.environ.get("PATH", ""):
-        os.environ["PATH"] = fs_bin + os.path.pathsep + os.environ.get("PATH", "")
+    if soundfont_path is not None:
+        soundfont_path = Path(soundfont_path)
+        if soundfont_path.exists():
+            return soundfont_path
 
-    if soundfont_path is None:
-        if _LOCAL_SOUNDFONT.exists():
-            return _LOCAL_SOUNDFONT
-            
-        # Check alternative common paths for MS Basic.sf3
-        alt_paths = [
-            Path("D:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
-            Path("C:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
-            Path("D:/Document/MuseScore/share/sound/MS Basic.sf3"),
-            Path("D:/Document/NC-Research/Music/MS Basic.sf3"),
-            Path("/content/NC-Musical/MS Basic.sf3"),
-            Path("/content/drive/MyDrive/NC-Musical-Models/MS Basic.sf3"),
-        ]
-        for path in alt_paths:
-            if path.exists():
-                return path
-                
-        # If not found anywhere, fallback to download
-        return download_if_necessary(SF2_URL)
+    # Common search paths (Google Colab & Drive cache)
+    candidate_paths = [
+        Path("/content/drive/MyDrive/NC-Musical-Models/MS Basic.sf3"),
+        Path("/content/NC-Musical/MS Basic.sf3"),
+        Path(__file__).parent.parent.parent.parent.parent.parent / "MS Basic.sf3",
+    ]
+    for path in candidate_paths:
+        if path.exists():
+            return path
 
-    soundfont_path = Path(soundfont_path)
-    if not soundfont_path.exists():
-        raise FileNotFoundError(
-            f"SoundFont not found: {soundfont_path}\\n"
-            "Place MS Basic.sf3 in the workspace root or specify a valid file."
-        )
-    return soundfont_path"""
+    return download_if_necessary(SF2_URL)"""
 
     patch_file(auralization_path, target_aur, replacement_aur)
-
-    # Patch server.py
-    server_path = muscriptor_dir / "server.py"
-    target_server = """    @app.get("/soundfonts/MuseScore_General.sf3")
-    async def soundfont() -> FileResponse:
-        \"\"\"Compressed soundfont for the web UI's in-browser synthesizer.
-
-        Fetched from SF3_URL on first request (in a worker thread, so the
-        event loop keeps serving) and cached locally.
-        \"\"\"
-        path = await asyncio.to_thread(download_if_necessary, SF3_URL)
-        return FileResponse(path, media_type="application/octet-stream")"""
-
-    replacement_server = """    @app.get("/soundfonts/MuseScore_General.sf3")
-    async def soundfont() -> FileResponse:
-        \"\"\"Compressed soundfont for the web UI's in-browser synthesizer.
-
-        Returns MS Basic.sf3 from the local workspace or installation.
-        \"\"\"
-        workspace_dir = Path(__file__).parent.parent.parent.parent
-        sf3_path = workspace_dir / "MS Basic.sf3"
-        if not sf3_path.exists():
-            fallbacks = [
-                Path("D:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
-                Path("C:/Program Files/MuseScore 4/sound/MS Basic.sf3"),
-                Path("D:/Document/MuseScore/share/sound/MS Basic.sf3"),
-                Path("D:/Document/NC-Research/Music/MS Basic.sf3"),
-                Path("/content/NC-Musical/MS Basic.sf3"),
-                Path("/content/drive/MyDrive/NC-Musical-Models/MS Basic.sf3"),
-            ]
-            for fb in fallbacks:
-                if fb.exists():
-                    sf3_path = fb
-                    break
-        
-        if sf3_path.exists():
-            return FileResponse(sf3_path, media_type="application/octet-stream")
-
-        path = await asyncio.to_thread(download_if_necessary, SF3_URL)
-        return FileResponse(path, media_type="application/octet-stream")"""
-
-    patch_file(server_path, target_server, replacement_server)
 
     # Patch tokenizer/mt3.py for instrument alias resolution
     mt3_path = muscriptor_dir / "tokenizer" / "mt3.py"

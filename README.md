@@ -1,99 +1,56 @@
-# NC-Musical: AI Music Transcription & Interactive Editor
+# NC-Musical: AI Music Transcription (Google Colab GPU & TPU Pipeline)
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb)
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
-![PyTorch CUDA](https://img.shields.io/badge/PyTorch-CUDA%20Accelerated-EE4C2C)
-![FastAPI](https://img.shields.io/badge/FastAPI-Server-009688)
-![SpessaSynth](https://img.shields.io/badge/SpessaSynth-v4.x%20SF3-purple)
+![PyTorch CUDA & TPU](https://img.shields.io/badge/Hardware-CUDA%20%7C%20TPU%20v5e-EE4C2C)
 ![License](https://img.shields.io/badge/License-Proprietary-red)
 
-NC-Musical is a production-grade, GPU-accelerated desktop and web application for Automatic Music Transcription (AMT) and interactive note editing. Built on top of the MuScriptor engine (MT3 architecture), it combines high-fidelity AI note extraction with an AnthemScore-style Piano Roll Editor and a real-time Web Audio SoundFont synthesis engine.
+**NC-Musical** is a high-performance Automatic Music Transcription (AMT) pipeline running directly inside **Google Colab**. Built on top of the MuScriptor / MT3 architecture, it converts audio, video, or YouTube links into multi-track MIDI notes and sheet music data with instant audio previews and automated chord analysis.
 
 ---
 
-## Quick Start Guide
+## Hardware Acceleration
 
-### 1. Cloud GPU Mode (Google Colab - Recommended)
+NC-Musical supports both **NVIDIA GPUs** and **Google Cloud TPUs**:
+* **Google Cloud TPU v5e-1** (via PyTorch/XLA & PJRT) — High-throughput inference.
+* **NVIDIA GPUs** (T4, L4, A100, V100 via CUDA) — Fast low-latency inference.
 
-Run NC-Musical with free NVIDIA GPU acceleration without installing local CUDA drivers or dependencies:
+---
+
+## Quick Start (Google Colab)
+
+Run NC-Musical with free hardware acceleration:
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/AgentHitmanFaris/NC-Musical/blob/Stable/NC_Musical_Colab.ipynb)
 
-> **Note for Private Repositories:** Because this repository is private, opening via the badge link requires authorizing Google Colab to access private repos:
-> 1. Go to [colab.research.google.com](https://colab.research.google.com), select the **GitHub** tab, and check **Include private repos**.
+> **Note for Private Repositories:** Because this repository is private:
+> 1. Open [colab.research.google.com](https://colab.research.google.com), select the **GitHub** tab, and check **Include private repos**.
 > 2. Click **Authorize Colab** and select `AgentHitmanFaris/NC-Musical` -> `NC_Musical_Colab.ipynb`.
-> 3. *Alternative:* Click **File -> Upload notebook** in Colab and upload `NC_Musical_Colab.ipynb` directly from your local repository folder.
+> 3. *Alternative:* Click **File -> Upload notebook** in Colab and upload `NC_Musical_Colab.ipynb` directly.
 
-1. In Colab, select **Runtime -> Change runtime type -> T4 GPU**.
-2. Run Step 1 (Mount Google Drive) to enable persistent model caching.
-3. Run Steps 2 to 4 to initialize dependencies, configure `HF_TOKEN`, and launch the backend.
-4. Click the generated proxy URL (`https://...googleusercontent.com/.../index.html` or Cloudflare Tunnel link) to open the interactive Web GUI directly in your browser.
-
----
-
-### 2. Local Desktop Application (Windows)
-
-Launch NC-Musical as a native desktop application powered by WebView2:
-
-1. Double-click the launcher script in the workspace root:
-   ```cmd
-   run_desktop.bat
-   ```
-2. Or execute via PowerShell/CMD:
-   ```powershell
-   .\venv\Scripts\python.exe app_desktop.py
-   ```
-
----
-
-### 3. Local Web Server Mode
-
-Run the FastAPI backend server directly and access the Web GUI from any web browser:
-
-```powershell
-.\venv\Scripts\python.exe server_gui.py --port 8222 --model medium --device auto
-```
-
-Then open your browser and navigate to: `http://127.0.0.1:8222/index.html`
+### Step-by-Step Execution:
+1. In Colab, select **Runtime -> Change runtime type** and choose **T4 GPU** (recommended).
+2. **Step 1 (Optional):** Connect Google Drive for persistent model and SoundFont caching (or uncheck to use fast session storage).
+3. **Step 2:** Check Hardware environment and install dependencies with live `yt-dlp` master builds.
+4. **Step 3:** Setup `MS Basic.sf3` SoundFont.
+5. **Step 4:** Run **AI Music Transcription (Batch & Single)**:
+   - Input: Paste single or multiple YouTube URLs (or leave blank to be prompted interactively), or upload multiple audio files.
+   - The pipeline transcribes each song sequentially and names output `.mid` and `_chords.txt` files using the real song title.
+   - Automatically downloads individual files and creates a combined `.zip` archive for batch jobs.
 
 ---
 
 ## Core Features
 
-### AnthemScore-Style Piano Roll Editor
-* **Select & Edit Mode (`1`):** Click and drag notes to adjust pitch and time. Drag note edges to alter duration. Select multiple notes using `Shift + Box Select` or keyboard arrow keys for micro-tuning.
-* **Draw Mode (`2`):** Paint new notes on grid locations corresponding to the active target instrument.
-* **Erase Mode (`3`):** Click notes to delete them instantly, or press `Delete` / `Backspace` on selected note clusters.
-* **Undo/Redo Stack:** Full 50-step state history with `Ctrl + Z` and `Ctrl + Y` support.
-* **Smart Auto-Follow:** Viewport smoothly pans during real-time playback or live AI transcription to keep the active playhead centered.
-
-### Multi-Instrument MS Basic.sf3 SoundFont Synthesis
-* **SpessaSynth SF3 Integration:** Integrated SoundFont engine powered by SpessaSynth v4 and `MS Basic.sf3` for multi-instrument playback (Piano, Nylon Guitar, Fingered Bass, Drums).
-* **AudioWorklet Architecture:** Multi-threaded Web Audio SoundFont processing prevents UI thread stuttering during note preview.
-* **Solo & Mute Channels:** Granular per-track controls to solo or mute specific instruments during real-time MIDI playback.
-* **Fallback Oscillator Synth:** Backup Web Audio oscillator synthesis when SoundFont file is uninitialized.
-
-### Session & Project Management
-* **Native OS File Save Dialogs:** Saves project JSON files and MIDI exports via a backend endpoint (`/save_file`), triggering native Windows File Save dialogs.
-* **Save Project:** Package notes, track states, active instruments, and audio references into `.json` project files.
-* **Load Project:** Restore previous editing sessions from `.json` files.
-* **Download MIDI:** Export full transcription or edited piano roll notes as standard `.mid` files.
-* **Auto-Save Protection:** Debounced LocalStorage auto-save with a session restore prompt on application launch.
-
-### GPU Acceleration & Backend Audio Export
-* **CUDA Hardware Detection:** Automatic detection and allocation of CUDA devices for MT3 model inference.
-* **FluidSynth Backend Auralization:** Render transcribed MIDI back into high-fidelity WAV audio using local `MS Basic.sf3` SoundFonts and FluidSynth.
-
----
-
-## Command Line Arguments (`server_gui.py`)
-
-| Argument | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `--host` | `str` | `127.0.0.1` | Bind IP address for the FastAPI server |
-| `--port` | `int` | `8222` | Port number to listen on |
-| `--model` | `str` | `large` | Model size: `small`, `medium`, or `large` |
-| `--device` | `str` | `auto` | Execution device: `cuda`, `cpu`, or `auto` |
+- **Instrument Focus & Isolation (Radio Presets + Custom Checkboxes):** Isolate specific parts from the mix (Piano Only, Acoustic & Electric Guitars, Bass & Drums, Vocals / Melody, Strings / Brass / Woodwinds, or Full Mix).
+- **Sequential Batch Transcription:** Queue multiple YouTube links or uploaded audio files; transcribe them in a single run.
+- **Original Song Title Naming:** Automatically extracts YouTube video titles (or uploaded file stems) and generates `<Song_Title>.mid` and `<Song_Title>_chords.txt`.
+- **Dynamic Interactive Prompts:** No hardcoded YouTube URLs — input via form or interactive prompt.
+- **Future-Proof YouTube Ingestion:** Always pulls latest upstream master releases of `yt-dlp` with multi-client fallbacks (`ios`, `android`, `web`, `tv_embedded`) and cookie support.
+- **Flexible Storage:** Optional 1-click Google Drive caching or fast ephemeral session storage without requiring permissions.
+- **Automated Chord Analysis:** Extracts and timestamps harmonic progressions using `music21`.
+- **In-Notebook Audio Synthesis:** FluidSynth auralization rendering MIDI output back to WAV audio directly in Colab.
+- **Instant File Downloads & Batch ZIP:** Automatically triggers browser downloads for individual outputs and bundles batch jobs into a `.zip` archive.
 
 ---
 
@@ -101,14 +58,10 @@ Then open your browser and navigate to: `http://127.0.0.1:8222/index.html`
 
 ```
 NC-Musical/
-├── NC_Musical_Colab.ipynb   # Google Colab Notebook with GPU & Drive caching
-├── index.html               # Main Web GUI (Piano Roll, SpessaSynth, Controls)
-├── app_desktop.py           # Native pywebview Desktop Application Launcher
-├── server_gui.py            # FastAPI Backend (Transcription, Save Dialogs, Auralize)
-├── patch_muscriptor.py      # Dependency patching utility for muscriptor
-├── run_desktop.bat          # One-click Windows desktop startup script
+├── NC_Musical_Colab.ipynb   # Main Google Colab Notebook pipeline
+├── patch_muscriptor.py      # Dependency patch utility for muscriptor in Colab
+├── transcribe.py            # Standalone CLI transcription script
 ├── MS Basic.sf3             # High-quality General MIDI SoundFont
-├── config.js                # Dynamic backend port configuration
 └── README.md                # Project documentation
 ```
 
