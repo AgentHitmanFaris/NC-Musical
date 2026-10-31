@@ -16,3 +16,7 @@ __pycache__/
 config.js
 cookies.txt
 .temp/
+
+.agents/
+GEMINI.md
+prompt.txt

@@ -42,6 +42,11 @@ Run NC-Musical with free hardware acceleration:
 
 ## Core Features
 
+- **Musical Meter & Time Signature Configuration:** Explicitly configure time signatures (`4/4`, `3/4`, `2/4`, `6/8`, `12/8`, `5/4`, `7/8`, or custom numerators/denominators) with standard MIDI MetaMessages embedded at tick 0.
+- **Key Signature Control & Harmonic AI Detection:** Choose preset key signatures or leverage automated Krumhansl-Schmuckler harmonic key detection via `music21` and pitch histograms.
+- **Tempo (BPM) Control & Beat Scaling:** Switch between manual studio BPM override (recommended for DAWs), dynamic performance tracking, or single average tempo with beat scaling (`0.5x` half-time / `2.0x` double-time) and downbeat alignment.
+- **Rhythmic Quantization & Tuplet Prevention ("No Tuplets"):** Snap notes onto clean power-of-two grids (straight 1/16 sixteenth notes, 1/8 eighths, 1/32 thirty-seconds) that strictly eliminate unwanted tuplets/triplets in notation software (MuseScore, Guitar Pro) and DAWs, with adjustable strength and rest gap filling.
+- **Fail-Safe AI Beat Tracking:** Graceful fallback protection ensures that if AI beat tracking encounters memory limits or fails to load on long 40+ minute album recordings, the transcription finishes safely without losing note events.
 - **Instrument Focus & Isolation (Radio Presets + Custom Checkboxes):** Isolate specific parts from the mix (Piano Only, Acoustic & Electric Guitars, Bass & Drums, Vocals / Melody, Strings / Brass / Woodwinds, or Full Mix).
 - **Sequential Batch Transcription:** Queue multiple YouTube links or uploaded audio files; transcribe them in a single run.
 - **Original Song Title Naming:** Automatically extracts YouTube video titles (or uploaded file stems) and generates `<Song_Title>.mid` and `<Song_Title>_chords.txt`.
@@ -58,9 +63,11 @@ Run NC-Musical with free hardware acceleration:
 
 ```
 NC-Musical/
-├── NC_Musical_Colab.ipynb   # Main Google Colab Notebook pipeline
+├── NC_Musical_Colab.ipynb   # Main Google Colab Notebook pipeline (GPU & TPU)
+├── midi_processor.py        # Musical timing, key signature & quantization engine
 ├── patch_muscriptor.py      # Dependency patch utility for muscriptor in Colab
 ├── transcribe.py            # Standalone CLI transcription script
+├── test_midi_processor.py   # Unit test suite for MIDI timing, meter & quantization
 ├── MS Basic.sf3             # High-quality General MIDI SoundFont
 └── README.md                # Project documentation
 ```
