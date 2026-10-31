@@ -28,14 +28,17 @@ def main():
     parser.add_argument("-o", "--output", default="output.mid", help="Output MIDI file path")
     parser.add_argument("--bpm", type=float, default=120.0, help="Tempo in beats per minute")
     parser.add_argument("--beat-scale", type=float, default=1.0, help="Scale tempo factor (e.g. 0.5 for half-time, 2.0 for double-time)")
-    parser.add_argument("--time-signature", "--time-sig", default="4/4", help="Time signature (e.g. 4/4, 3/4, 6/8, 12/8, 5/4)")
+    parser.add_argument("--time-signature", "--time-sig", default="auto", help="Time signature ('auto' for adaptive detection, or 4/4, 3/4, 6/8)")
     parser.add_argument("--beats-per-bar", type=int, default=None, help="Numerator of time signature (overrides time-signature)")
     parser.add_argument("--time-sig-denom", type=int, default=None, help="Denominator of time signature (overrides time-signature)")
     parser.add_argument("--key-signature", "--key", default="auto", help="Key signature (e.g. 'auto', 'C', 'Am', 'G', 'Em', 'D', 'Bb')")
 
-    # Quantization & Tuplets
+    # Quantization, Single Voice & Track Separation
     parser.add_argument("--quantize", dest="quantize", action="store_true", default=True, help="Enable rhythmic grid quantization")
     parser.add_argument("--no-quantize", dest="quantize", action="store_false", help="Disable rhythmic grid quantization")
+    parser.add_argument("--single-voice", dest="single_voice", action="store_true", default=True, help="Force strictly 1 clean voice (Voice 1 in MuseScore) with ZERO overlaps (no Moonlight Sonata 2-voicing)")
+    parser.add_argument("--polyphonic", dest="single_voice", action="store_false", help="Allow polyphonic simultaneous chords (may produce multiple voices in MuseScore)")
+    parser.add_argument("--separate-tracks", action="store_true", default=True, help="Separate each instrument and channel into its own dedicated track/staff in MuseScore")
     parser.add_argument("--no-tuplets", action="store_true", default=True, help="Enforce straight binary grid (1/16 sixteenth notes, no triplets/tuplets)")
     parser.add_argument("--grid", type=int, default=4, help="Grid subdivision per beat (4 = 1/16 sixteenths, 2 = 1/8 eighths, 3 = triplets, 8 = 1/32)")
     parser.add_argument("--quantize-strength", type=float, default=1.0, help="Quantization strength from 0.0 (no snap) to 1.0 (strict snap)")
@@ -59,7 +62,10 @@ def main():
     output_midi_path = args.pos_output if args.pos_output else args.output
 
     # Resolve time signature
-    parsed_num, parsed_denom = parse_time_signature_string(args.time_signature)
+    if args.time_signature and "auto" not in str(args.time_signature).lower():
+        parsed_num, parsed_denom = parse_time_signature_string(args.time_signature)
+    else:
+        parsed_num, parsed_denom = None, None
     time_sig_num = args.beats_per_bar if args.beats_per_bar is not None else parsed_num
     time_sig_denom = args.time_sig_denom if args.time_sig_denom is not None else parsed_denom
 
@@ -111,8 +117,8 @@ def main():
         print(f"Transcribed {len(events)} note events.")
         raw_midi_bytes = model.events_to_midi_bytes(iter(events))
 
-        # Apply robust musical timing, key signature, tempo, and tuplet-free quantization
-        print("Applying post-processing (Time Signature, Key Signature, Tempo & Quantization)...")
+        # Apply robust musical timing, key signature, tempo, single-voice, and tuplet-free quantization
+        print("Applying post-processing (Time Signature, Key Signature, Tempo, Single Voice & Quantization)...")
         _, final_midi_bytes, meta = postprocess_midi(
             midi_source=raw_midi_bytes,
             output_path=output_midi_path,
@@ -125,7 +131,9 @@ def main():
             quantize_strength=args.quantize_strength,
             fill_gaps_beats=args.fill_gaps,
             trim_leading_bars=args.trim_leading_bars,
-            beat_scale=args.beat_scale
+            beat_scale=args.beat_scale,
+            single_voice=args.single_voice,
+            separate_channels=args.separate_tracks
         )
 
         print("━" * 60)
@@ -135,6 +143,8 @@ def main():
         print(f" • Key Signature:  {meta['key_signature']}")
         print(f" • Tempo (BPM):    {meta['bpm']:.1f}")
         print(f" • Quantization:   {'Enabled (No Tuplets - 1/16 Grid)' if meta.get('no_tuplets') else ('Enabled' if meta['quantized'] else 'Disabled')}")
+        print(f" • MuseScore Voice: {'Strict Single Voice (Clean Voice 1 - No 2-Voicing)' if meta.get('single_voice') else 'Polyphonic Multi-Voice'}")
+        print(f" • Track Staves:   {'Separated per Instrument/Channel' if meta.get('separate_channels') else 'Original'}")
         print("━" * 60)
 
     except Exception as e:

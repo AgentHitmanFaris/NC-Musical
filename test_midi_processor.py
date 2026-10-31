@@ -95,8 +95,103 @@ def test_quantization_no_tuplets():
     print("✓ Quantization with 'No Tuplets' (1/16 sixteenth grid) test passed")
 
 
+def test_single_voice_monophonic_resolution():
+    """Verify that overlapping vocal syllables and chord bleeds are strictly reduced to 1 clean voice."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mid.tracks.append(tr)
+
+    # Note 1: C4 (tick 0 to 480)
+    tr.append(mido.Message('note_on', note=60, velocity=80, time=0))
+    # Note 1b (Ghost bleed/chord at tick 0 with lower velocity): E4
+    tr.append(mido.Message('note_on', note=64, velocity=40, time=0))
+    # Note 2 starts at tick 240 (BEFORE Note 1 ends! Overlap = Moonlight Sonata dual voice bug)
+    tr.append(mido.Message('note_on', note=67, velocity=90, time=240))
+    # Note 1 off arrives at tick 240 delta (abs 480)
+    tr.append(mido.Message('note_off', note=60, velocity=0, time=240))
+    tr.append(mido.Message('note_off', note=64, velocity=0, time=0))
+    # Note 2 off arrives at tick 480 delta (abs 960)
+    tr.append(mido.Message('note_off', note=67, velocity=0, time=480))
+
+    processed, out_bytes, meta = midi_processor.postprocess_midi(
+        mid,
+        bpm=120.0,
+        time_sig_num=4,
+        time_sig_denom=4,
+        key_signature='C',
+        quantize=True,
+        grid_div=4,
+        single_voice=True
+    )
+
+    # Inspect all notes in processed tracks
+    for t in processed.tracks:
+        active = {}
+        curr = 0
+        notes = []
+        for msg in t:
+            curr += msg.time
+            if msg.type == 'note_on' and msg.velocity > 0:
+                active[msg.note] = curr
+            elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+                if msg.note in active:
+                    start = active.pop(msg.note)
+                    notes.append({'pitch': msg.note, 'start': start, 'end': curr})
+
+        notes.sort(key=lambda x: x['start'])
+        # Verify strictly NO overlaps (pure Voice 1, no MuseScore 2-voicing)
+        for i in range(len(notes) - 1):
+            cur_n = notes[i]
+            next_n = notes[i + 1]
+            assert cur_n['end'] <= next_n['start'], (
+                f"Overlap detected: Note {cur_n['pitch']} ({cur_n['start']}..{cur_n['end']}) "
+                f"overlaps next note {next_n['pitch']} ({next_n['start']}..{next_n['end']})!"
+            )
+
+    print("✓ Single-voice monophonic resolution test passed: Zero overlaps, clean Voice 1 guaranteed")
+
+
+def test_channel_separation_to_tracks():
+    """Verify that multi-channel events in a single track are separated into individual staves."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mid.tracks.append(tr)
+
+    # Channel 0 (Vocal)
+    tr.append(mido.Message('note_on', channel=0, note=60, velocity=80, time=0))
+    # Channel 1 (Piano)
+    tr.append(mido.Message('note_on', channel=1, note=48, velocity=70, time=0))
+    tr.append(mido.Message('note_off', channel=0, note=60, velocity=0, time=480))
+    tr.append(mido.Message('note_off', channel=1, note=48, velocity=0, time=0))
+
+    separated = midi_processor.separate_multichannel_tracks(mid)
+    # Should have Tempo track + Channel 0 track + Channel 1 track
+    assert len(separated.tracks) >= 3, f"Expected at least 3 tracks, got {len(separated.tracks)}"
+    print("✓ Channel separation test passed: Multi-channel streams split into dedicated staves")
+
+
+def test_time_signature_auto_detection():
+    """Verify auto-detection of time signature (e.g. 3/4 waltz vs 4/4 common time)."""
+    # Create 3/4 waltz onsets (every 3 beats: ticks 0, 1440, 2880, 4320...)
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mid.tracks.append(tr)
+
+    for i in range(16):
+        # Downbeat on beat 0 of every 3-beat measure
+        tr.append(mido.Message('note_on', note=60, velocity=80, time=0 if i == 0 else 1440))
+        tr.append(mido.Message('note_off', note=60, velocity=0, time=240))
+
+    detected_num, detected_denom = midi_processor.detect_time_signature_from_midi(mid)
+    assert detected_num == 3 and detected_denom == 4, f"Expected 3/4, got {detected_num}/{detected_denom}"
+    print("✓ Time signature auto-detection test passed: 3/4 waltz meter")
+
+
 if __name__ == "__main__":
     test_key_signature_detection()
     test_time_signature_and_tempo_embedding()
+    test_time_signature_auto_detection()
     test_quantization_no_tuplets()
+    test_single_voice_monophonic_resolution()
+    test_channel_separation_to_tracks()
     print("\nALL MIDI PROCESSOR TESTS PASSED!")
