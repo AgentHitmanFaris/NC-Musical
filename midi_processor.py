@@ -124,10 +124,18 @@ def detect_key_signature_from_midi(mid: mido.MidiFile) -> str:
 
 
 def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
-    """Separate any tracks containing multiple MIDI channels into dedicated individual tracks.
+    """Separate MIDI channels and instruments into dedicated staves for MuseScore.
     
-    This ensures that when opened in MuseScore, each instrument/channel lands on its own
-    clean staff rather than being merged into a single staff with overlapping voices.
+    1. Piano is partitioned into a complete Grand Staff:
+       - 'Piano (Right Hand - Treble Clef)': Notes >= 60 (Treble staff with full polyphonic chords)
+       - 'Piano (Left Hand - Bass Clef)': Notes < 60 (Bass staff with full polyphonic chords)
+    2. Drums are assigned to Channel 9 with full polyphonic kit (Kick, Snare, Hi-Hat, etc.).
+    3. Guitars are separated into distinct tracks:
+       - 'Distorted Electric Guitar' (Overdrive/Distortion)
+       - 'Clean Electric Guitar' (or Acoustic Guitar)
+       - 'Electric Bass' (Bass Clef)
+    4. Vocals are assigned to a dedicated Track: 'Vocals (Clean Voice 1)'.
+    5. Strings, Brass, Woodwinds, and Synths are assigned to their own dedicated staves.
     """
     new_mid = mido.MidiFile(ticks_per_beat=mid.ticks_per_beat or 480)
     
@@ -135,24 +143,19 @@ def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
     tempo_track = mido.MidiTrack()
     new_mid.tracks.append(tempo_track)
     
-    # Collect all channel events and meta events across all tracks
-    channel_tracks = {}
+    # Track active program per channel and gather all note pairs & non-note events
+    active_program = {}
+    note_events_by_group = {}
+    other_events = []
     
+    # First pass: map tempo track meta messages
     for track in mid.tracks:
         curr_tick = 0
         for msg in track:
             curr_tick += msg.time
-            if msg.is_meta:
-                if msg.type in ('set_tempo', 'time_signature', 'key_signature', 'smpte_offset'):
-                    tempo_track.append(msg.copy(time=curr_tick))
-                else:
-                    # Generic meta messages can route to channel 0 or active channel
-                    channel_tracks.setdefault(0, []).append((curr_tick, msg))
-            else:
-                ch = getattr(msg, 'channel', 0)
-                channel_tracks.setdefault(ch, []).append((curr_tick, msg))
+            if msg.is_meta and msg.type in ('set_tempo', 'time_signature', 'key_signature', 'smpte_offset'):
+                tempo_track.append(msg.copy(time=curr_tick))
                 
-    # Sort tempo track events and convert to delta times
     tempo_track_events = sorted([(msg.time, msg) for msg in tempo_track], key=lambda x: x[0])
     tempo_track.clear()
     prev = 0
@@ -161,130 +164,262 @@ def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
         tempo_track.append(msg)
         prev = tick
     tempo_track.append(mido.MetaMessage('end_of_track', time=0))
-    
-    # GM Instrument name hints for clean MuseScore display
-    instrument_names = {
-        0: "Vocal / Lead Melody",
-        1: "Acoustic Piano",
-        2: "Electric Piano",
-        3: "Acoustic Guitar",
-        4: "Electric Guitar",
-        5: "Bass",
-        6: "Strings",
-        7: "Brass / Horns",
-        8: "Woodwinds / Flutes",
-        9: "Drums / Percussion",
-        10: "Synth Lead",
-        11: "Synth Pad"
-    }
 
-    # Build separate tracks for each channel
-    for ch in sorted(channel_tracks.keys()):
-        raw_events = channel_tracks[ch]
-        # Skip empty channel tracks
-        has_notes = any((getattr(m, 'type', '') == 'note_on' and getattr(m, 'velocity', 0) > 0) for _, m in raw_events)
-        if not has_notes and ch != 0:
-            continue
-            
-        track = mido.MidiTrack()
-        track_title = instrument_names.get(ch, f"Track (Channel {ch + 1})")
-        track.append(mido.MetaMessage('track_name', name=track_title, time=0))
-        
-        # Sort events by absolute tick
-        raw_events.sort(key=lambda x: x[0])
-        prev_t = 0
-        for atick, msg in raw_events:
-            msg_copy = msg.copy()
-            msg_copy.time = max(0, atick - prev_t)
-            track.append(msg_copy)
-            prev_t = atick
-        track.append(mido.MetaMessage('end_of_track', time=0))
-        new_mid.tracks.append(track)
-        
-    if len(new_mid.tracks) == 1:
-        # If no notes were found, ensure at least one track
+    # Second pass: extract note pairs with instrument classification
+    for track in mid.tracks:
+        curr_tick = 0
+        active_notes = {}
+        track_meta_name = ""
+        for msg in track:
+            if msg.is_meta and msg.type == 'track_name':
+                track_meta_name = msg.name.lower()
+                break
+
+        for msg in track:
+            curr_tick += msg.time
+            if msg.is_meta:
+                continue
+            ch = getattr(msg, 'channel', 0)
+            if msg.type == 'program_change':
+                active_program[ch] = msg.program
+            elif msg.type == 'note_on' and msg.velocity > 0:
+                prog = active_program.get(ch, None)
+                active_notes.setdefault((ch, msg.note), []).append((curr_tick, msg, prog, track_meta_name))
+            elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+                k = (ch, msg.note)
+                if k in active_notes and active_notes[k]:
+                    start_t, on_msg, prog, tname = active_notes[k].pop(0)
+                    
+                    # Instrument classification
+                    if ch == 9 or "drum" in tname:
+                        grp = 'drums'
+                    elif "vocal" in tname or "voice" in tname or prog in (52, 53, 54, 85, 91) or (ch == 0 and (prog is None or prog in (52, 53, 54, 85, 91)) and "piano" not in tname and "guitar" not in tname):
+                        grp = 'vocal'
+                    elif "piano" in tname or "keys" in tname or (prog in (0, 1, 2, 3, 4, 5) and ch != 0) or (prog in (0, 1, 2, 3, 4, 5) and "piano" in tname):
+                        grp = 'piano'
+                    elif "bass" in tname or prog in (32, 33, 34, 35, 36, 37, 38, 39):
+                        grp = 'bass'
+                    elif "distort" in tname or prog in (29, 30):
+                        grp = 'dist_guitar'
+                    elif "guitar" in tname or prog in (24, 25, 26, 27, 28):
+                        grp = 'clean_guitar'
+                    elif prog is not None and 40 <= prog <= 51:
+                        grp = 'strings'
+                    elif prog is not None and 56 <= prog <= 63:
+                        grp = 'brass'
+                    elif prog is not None and 64 <= prog <= 75:
+                        grp = 'woodwinds'
+                    elif prog is not None and 80 <= prog <= 103:
+                        grp = 'synth'
+                    elif prog in (0, 1, 2, 3, 4, 5):
+                        grp = 'piano'
+                    else:
+                        grp = 'vocal' if ch == 0 else f'inst_{prog or ch}'
+
+                    note_events_by_group.setdefault(grp, []).append({
+                        'channel': ch,
+                        'program': prog or 0,
+                        'pitch': msg.note,
+                        'start': start_t,
+                        'end': curr_tick,
+                        'on_msg': on_msg,
+                        'off_msg': msg
+                    })
+
+    # If no structured groups found, fallback to basic tracks
+    if not note_events_by_group:
         empty_tr = mido.MidiTrack()
         empty_tr.append(mido.MetaMessage('track_name', name="Lead Melody", time=0))
         empty_tr.append(mido.MetaMessage('end_of_track', time=0))
         new_mid.tracks.append(empty_tr)
+        return new_mid
+
+    # Helper to serialize note pairs into a new MidiTrack
+    def _create_track(title, channel, program, notes):
+        if not notes:
+            return None
+        tr = mido.MidiTrack()
+        tr.append(mido.MetaMessage('track_name', name=title, time=0))
+        tr.append(mido.Message('program_change', channel=channel, program=program, time=0))
+        events = []
+        for n in notes:
+            on_m = n['on_msg'].copy(channel=channel)
+            off_m = n['off_msg'].copy(channel=channel)
+            events.append((n['start'], 2, on_m))
+            events.append((n['end'], 1, off_m))
+        events.sort(key=lambda x: (x[0], x[1]))
+        prev_t = 0
+        for atick, _, m in events:
+            m.time = max(0, atick - prev_t)
+            tr.append(m)
+            prev_t = atick
+        tr.append(mido.MetaMessage('end_of_track', time=0))
+        return tr
+
+    # 1. Vocals Track (Channel 0, Program 54)
+    if 'vocal' in note_events_by_group:
+        tr = _create_track("Vocals (Clean Voice 1)", 0, 54, note_events_by_group['vocal'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 2. Piano Grand Staff: Treble Clef (RH >= 60) and Bass Clef (LH < 60)
+    if 'piano' in note_events_by_group:
+        piano_notes = note_events_by_group['piano']
+        rh_notes = [n for n in piano_notes if n['pitch'] >= 60]
+        lh_notes = [n for n in piano_notes if n['pitch'] < 60]
+
+        if rh_notes:
+            tr_rh = _create_track("Piano (Right Hand - Treble Clef)", 1, 0, rh_notes)
+            if tr_rh: new_mid.tracks.append(tr_rh)
+        if lh_notes:
+            tr_lh = _create_track("Piano (Left Hand - Bass Clef)", 2, 0, lh_notes)
+            if tr_lh: new_mid.tracks.append(tr_lh)
+        if not rh_notes and not lh_notes:
+            tr_p = _create_track("Piano (Full Grand Staff)", 1, 0, piano_notes)
+            if tr_p: new_mid.tracks.append(tr_p)
+
+    # 3. Clean / Acoustic Guitar (Channel 3, Program 27/25)
+    if 'clean_guitar' in note_events_by_group:
+        tr = _create_track("Clean Electric Guitar", 3, 27, note_events_by_group['clean_guitar'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 4. Distorted Electric Guitar (Channel 4, Program 29)
+    if 'dist_guitar' in note_events_by_group:
+        tr = _create_track("Distorted Electric Guitar", 4, 29, note_events_by_group['dist_guitar'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 5. Electric Bass (Channel 5, Program 33 - Bass Clef)
+    if 'bass' in note_events_by_group:
+        tr = _create_track("Electric Bass", 5, 33, note_events_by_group['bass'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 6. Strings (Channel 6, Program 48)
+    if 'strings' in note_events_by_group:
+        tr = _create_track("Strings Ensemble", 6, 48, note_events_by_group['strings'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 7. Brass (Channel 7, Program 61)
+    if 'brass' in note_events_by_group:
+        tr = _create_track("Brass Section", 7, 61, note_events_by_group['brass'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 8. Woodwinds / Flutes (Channel 8, Program 73)
+    if 'woodwinds' in note_events_by_group:
+        tr = _create_track("Woodwinds / Flutes", 8, 73, note_events_by_group['woodwinds'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 9. Synthesizer / Pads (Channel 10, Program 80)
+    if 'synth' in note_events_by_group:
+        tr = _create_track("Synthesizer", 10, 80, note_events_by_group['synth'])
+        if tr: new_mid.tracks.append(tr)
+
+    # 10. Drums (Channel 9, Program 0 - GM Standard Kit)
+    if 'drums' in note_events_by_group:
+        tr = _create_track("Drums (Full Kit)", 9, 0, note_events_by_group['drums'])
+        if tr: new_mid.tracks.append(tr)
+
+    # Any remaining unmapped groups
+    for grp, notes in note_events_by_group.items():
+        if grp not in ('vocal', 'piano', 'clean_guitar', 'dist_guitar', 'bass', 'strings', 'brass', 'woodwinds', 'synth', 'drums'):
+            prog = notes[0].get('program', 0)
+            ch = min(15, max(11, notes[0].get('channel', 11)))
+            tr = _create_track(f"Instrument (Track {grp})", ch, prog, notes)
+            if tr: new_mid.tracks.append(tr)
 
     return new_mid
 
 
-def clean_monophonic_voice(
+def clean_monophonic_vocal(
     note_pairs: list[dict],
     grid_ticks: int = 120,
-    fill_gap_ticks: int = 120,
-    priority: str = "velocity_pitch"
+    fill_gap_ticks: int = 120
 ) -> list[dict]:
-    """Force notes into a strictly single, monophonic melody line (Voice 1 in MuseScore).
+    """Fine-tuned vocal melody cleaner: produces the cleanest single-voice notation and structure.
     
-    MuseScore creates 2-voicing (Moonlight Sonata 1st movement style with Voice 1 up-stems
-    and Voice 2 down-stems plus separate rests) whenever notes on the same staff overlap
-    in time. This function guarantees:
-      1. At any tick, at most ONE note sounds (ghost overtones & chord bleed are eliminated).
-      2. No note overlaps the subsequent note: note[i].end <= note[i+1].start.
-      3. Consecutive notes connect cleanly without fragmented micro-rests.
+    1. Rejects spurious transient blips (< 24 ticks / ~30ms) caused by unvoiced consonants/breath noise.
+    2. Filters non-vocal acoustic rumble (< 36) and high overtone squeaks (> 90).
+    3. Resolves polyphonic overtone collisions: selects the dominant fundamental pitch
+       (favoring higher acoustic velocity and melodic continuity within singing range).
+    4. Enforces strict zero-overlap: note[i].end <= note[i+1].start (no 2-voicing in MuseScore).
+    5. Applies natural legato smoothing: connects syllables across small breath gaps (<= 1/16th)
+       while preserving natural pauses.
     """
     if not note_pairs:
         return []
 
-    # Sort strictly chronologically by start time.
-    # For simultaneous onsets, place the dominant melody note (highest velocity or highest pitch) first.
+    min_dur = max(24, grid_ticks // 4)
+    # Sort chronologically by start time; for same onset, higher velocity and singing-range pitch first
     def sort_key(n):
         vel = getattr(n.get('on_msg'), 'velocity', 64)
-        return (n['start'], -vel, -n['pitch'])
+        p = n['pitch']
+        in_vocal_range = 1 if 40 <= p <= 85 else 0
+        return (n['start'], -vel, -in_vocal_range, -p)
 
     sorted_notes = sorted(note_pairs, key=sort_key)
+    chain = []
     
-    # Pass 1: Eliminate polyphonic simultaneous notes and resolve collisions
-    single_chain = []
     for n in sorted_notes:
-        if not single_chain:
-            single_chain.append(dict(n))
+        dur = n['end'] - n['start']
+        # Filter micro-jitter blips
+        if dur < min_dur:
             continue
-            
-        prev = single_chain[-1]
+        # Filter out-of-range vocal noise if outside standard vocal compass
+        if n['pitch'] < 36 or n['pitch'] > 92:
+            continue
+
+        if not chain:
+            chain.append(dict(n))
+            continue
+
+        prev = chain[-1]
         
-        # If the new note starts at the exact same tick, keep the dominant note
+        # Same onset collision: pick the dominant fundamental vocal note
         if n['start'] == prev['start']:
             n_vel = getattr(n.get('on_msg'), 'velocity', 64)
             prev_vel = getattr(prev.get('on_msg'), 'velocity', 64)
-            if (n_vel > prev_vel) or (n_vel == prev_vel and n['pitch'] > prev['pitch']):
-                single_chain[-1] = dict(n)
+            if n_vel > prev_vel + 10:
+                chain[-1] = dict(n)
+            elif abs(n_vel - prev_vel) <= 10:
+                # Prefer central vocal register (A2 to A5, 45 to 81)
+                if 45 <= n['pitch'] <= 81 and (prev['pitch'] < 45 or prev['pitch'] > 81):
+                    chain[-1] = dict(n)
+                elif n['pitch'] > prev['pitch'] and 45 <= n['pitch'] <= 84:
+                    chain[-1] = dict(n)
             continue
-            
+
         # If previous note extends past the start of the new note, truncate previous note!
         if prev['end'] > n['start']:
             prev['end'] = n['start']
-            # If the truncated previous note became negligibly short (< grid_ticks / 4), discard it as noise
-            if prev['end'] - prev['start'] < max(1, grid_ticks // 4):
-                single_chain.pop()
-                if single_chain and single_chain[-1]['end'] > n['start']:
-                    single_chain[-1]['end'] = n['start']
-                    
-        single_chain.append(dict(n))
+            if prev['end'] - prev['start'] < min_dur:
+                chain.pop()
+                if chain and chain[-1]['end'] > n['start']:
+                    chain[-1]['end'] = n['start']
 
-    # Pass 2: Legato rest filling between consecutive syllables
+        chain.append(dict(n))
+
+    # Natural legato smoothing between consecutive syllables
     if fill_gap_ticks > 0:
-        for i in range(len(single_chain) - 1):
-            cur_n = single_chain[i]
-            next_n = single_chain[i + 1]
+        for i in range(len(chain) - 1):
+            cur_n = chain[i]
+            next_n = chain[i + 1]
             gap = next_n['start'] - cur_n['end']
             if 0 < gap <= fill_gap_ticks:
                 cur_n['end'] = next_n['start']
 
-    # Pass 3: Final validation — verify zero overlaps
-    cleaned = []
-    for n in single_chain:
-        if n['end'] > n['start']:
-            cleaned.append(n)
-            
+    cleaned = [n for n in chain if n['end'] > n['start']]
     for i in range(len(cleaned) - 1):
         if cleaned[i]['end'] > cleaned[i + 1]['start']:
             cleaned[i]['end'] = cleaned[i + 1]['start']
 
     return cleaned
+
+
+def clean_monophonic_voice(
+    note_pairs: list[dict],
+    grid_ticks: int = 120,
+    fill_gap_ticks: int = 120
+) -> list[dict]:
+    """General monophonic voice reduction (for Bass and Lead lines)."""
+    return clean_monophonic_vocal(note_pairs, grid_ticks=grid_ticks, fill_gap_ticks=fill_gap_ticks)
 
 
 def quantize_midi_tracks(
@@ -386,8 +521,34 @@ def quantize_midi_tracks(
         if not note_pairs:
             continue
 
-        # If single_voice mode is enabled, enforce monophonic vocal line before quantization
-        if single_voice:
+        # Extract track metadata to determine instrument type
+        track_name = ""
+        for msg in track:
+            if msg.is_meta and msg.type == 'track_name':
+                track_name = msg.name
+                break
+        tname_lower = track_name.lower()
+
+        is_piano_track = ("piano" in tname_lower) or ("grand staff" in tname_lower)
+        is_drums_track = ("drum" in tname_lower) or any(getattr(m, 'channel', 0) == 9 for m in track if not m.is_meta)
+        is_guitar_track = ("guitar" in tname_lower) and ("bass" not in tname_lower)
+        is_bass_track = ("bass" in tname_lower) and not is_drums_track and not is_piano_track
+        is_other_polyphonic = ("strings" in tname_lower) or ("brass" in tname_lower) or ("woodwinds" in tname_lower) or ("synth" in tname_lower)
+
+        is_polyphonic = is_piano_track or is_drums_track or is_guitar_track or is_other_polyphonic
+        is_vocal_track = ("vocal" in tname_lower) or ("voice" in tname_lower) or (not is_polyphonic and not is_bass_track)
+
+        # Voicing strategy:
+        # 1. Vocals: Strict fine-tuned monophonic reduction (Voice 1 in MuseScore, zero 2-voicing)
+        # 2. Bass: Monophonic bassline reduction (clean bass clef)
+        # 3. Piano, Drums, Guitars: PRESERVE FULL POLYPHONY (Chords, Full Drum Kit, Both Piano Hands)
+        if is_vocal_track and single_voice:
+            note_pairs = clean_monophonic_vocal(
+                note_pairs,
+                grid_ticks=grid_ticks,
+                fill_gap_ticks=fill_gap_ticks
+            )
+        elif is_bass_track and single_voice:
             note_pairs = clean_monophonic_voice(
                 note_pairs,
                 grid_ticks=grid_ticks,
@@ -428,10 +589,9 @@ def quantize_midi_tracks(
                 'off_msg': n['off_msg']
             })
 
-        # CRITICAL: Post-quantization non-overlap guarantee
-        # Quantizing durations can cause snapped notes to bleed into the next note's start.
-        # In single_voice mode, clamp each note's end so it never overlaps the next onset!
-        if single_voice:
+        # CRITICAL: Post-quantization non-overlap guarantee ONLY for monophonic tracks (Vocals & Bass)
+        # Polyphonic tracks (Piano, Drums, Guitars) keep ALL simultaneous chord notes & drum hits!
+        if is_vocal_track or (is_bass_track and single_voice):
             quantized_notes.sort(key=lambda x: (x['start'], -getattr(x.get('on_msg'), 'velocity', 64), -x['pitch']))
             non_overlapping = []
             for qn in quantized_notes:

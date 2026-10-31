@@ -187,6 +187,118 @@ def test_time_signature_auto_detection():
     print("✓ Time signature auto-detection test passed: 3/4 waltz meter")
 
 
+def test_piano_grand_staff_and_polyphony():
+    """Verify that Piano generates a complete Grand Staff (Treble + Bass clefs) with full polyphony."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    tr.append(mido.MetaMessage('track_name', name="Piano", time=0))
+    tr.append(mido.Message('program_change', channel=1, program=0, time=0))
+    mid.tracks.append(tr)
+
+    # RH Chord: C4 (60), E4 (64), G4 (67)
+    tr.append(mido.Message('note_on', channel=1, note=60, velocity=80, time=0))
+    tr.append(mido.Message('note_on', channel=1, note=64, velocity=80, time=0))
+    tr.append(mido.Message('note_on', channel=1, note=67, velocity=80, time=0))
+    # LH Bass: C3 (48), G2 (43)
+    tr.append(mido.Message('note_on', channel=1, note=48, velocity=75, time=0))
+    tr.append(mido.Message('note_on', channel=1, note=43, velocity=70, time=0))
+
+    tr.append(mido.Message('note_off', channel=1, note=60, velocity=0, time=480))
+    tr.append(mido.Message('note_off', channel=1, note=64, velocity=0, time=0))
+    tr.append(mido.Message('note_off', channel=1, note=67, velocity=0, time=0))
+    tr.append(mido.Message('note_off', channel=1, note=48, velocity=0, time=0))
+    tr.append(mido.Message('note_off', channel=1, note=43, velocity=0, time=0))
+
+    processed, out_bytes, meta = midi_processor.postprocess_midi(mid, quantize=True, single_voice=True)
+
+    rh_track = None
+    lh_track = None
+    for t in processed.tracks:
+        for msg in t:
+            if msg.is_meta and msg.type == 'track_name':
+                if "Right Hand - Treble Clef" in msg.name:
+                    rh_track = t
+                elif "Left Hand - Bass Clef" in msg.name:
+                    lh_track = t
+
+    assert rh_track is not None, "Piano Right Hand (Treble Clef) track missing!"
+    assert lh_track is not None, "Piano Left Hand (Bass Clef) track missing!"
+
+    # Verify RH polyphonic chord (3 notes) and LH polyphonic bass (2 notes)
+    rh_notes = [m.note for m in rh_track if m.type == 'note_on' and m.velocity > 0]
+    lh_notes = [m.note for m in lh_track if m.type == 'note_on' and m.velocity > 0]
+
+    assert len(rh_notes) == 3, f"Expected 3 RH notes, got {len(rh_notes)}"
+    assert len(lh_notes) == 2, f"Expected 2 LH notes, got {len(lh_notes)}"
+    assert all(p >= 60 for p in rh_notes), "RH notes must be >= Middle C (60) for Treble Clef"
+    assert all(p < 60 for p in lh_notes), "LH notes must be < Middle C (60) for Bass Clef"
+
+    print("✓ Full Piano Grand Staff test passed: Treble & Bass staves with full chords intact")
+
+
+def test_drums_full_kit_polyphony():
+    """Verify that Drums retain simultaneous hits (Kick, Snare, Hi-Hat) without monophonic pruning."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    tr.append(mido.MetaMessage('track_name', name="Drums", time=0))
+    mid.tracks.append(tr)
+
+    # Simultaneous Kick (36) and Closed Hat (42)
+    tr.append(mido.Message('note_on', channel=9, note=36, velocity=95, time=0))
+    tr.append(mido.Message('note_on', channel=9, note=42, velocity=85, time=0))
+    tr.append(mido.Message('note_off', channel=9, note=36, velocity=0, time=120))
+    tr.append(mido.Message('note_off', channel=9, note=42, velocity=0, time=0))
+
+    processed, out_bytes, meta = midi_processor.postprocess_midi(mid, quantize=True, single_voice=True)
+
+    drum_track = None
+    for t in processed.tracks:
+        for msg in t:
+            if msg.is_meta and msg.type == 'track_name' and "Drums" in msg.name:
+                drum_track = t
+
+    assert drum_track is not None, "Drum track missing!"
+    drum_notes = [m.note for m in drum_track if m.type == 'note_on' and m.velocity > 0]
+    assert 36 in drum_notes and 42 in drum_notes, "Both Kick and Hi-Hat must be preserved simultaneously in Drums!"
+    print("✓ Full Drums polyphony test passed: Multi-percussion hits preserved")
+
+
+def test_guitar_clean_and_distortion_separation():
+    """Verify that Distorted Guitar, Clean Guitar, and Electric Bass are separated into distinct staves."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mid.tracks.append(tr)
+
+    # Clean Guitar (prog 27)
+    tr.append(mido.Message('program_change', channel=3, program=27, time=0))
+    tr.append(mido.Message('note_on', channel=3, note=64, velocity=80, time=0))
+    tr.append(mido.Message('note_off', channel=3, note=64, velocity=0, time=240))
+
+    # Distorted Guitar (prog 29)
+    tr.append(mido.Message('program_change', channel=4, program=29, time=0))
+    tr.append(mido.Message('note_on', channel=4, note=65, velocity=85, time=0))
+    tr.append(mido.Message('note_off', channel=4, note=65, velocity=0, time=240))
+
+    # Electric Bass (prog 33)
+    tr.append(mido.Message('program_change', channel=5, program=33, time=0))
+    tr.append(mido.Message('note_on', channel=5, note=40, velocity=90, time=0))
+    tr.append(mido.Message('note_off', channel=5, note=40, velocity=0, time=240))
+
+    processed, out_bytes, meta = midi_processor.postprocess_midi(mid, quantize=True, single_voice=True)
+
+    track_titles = []
+    for t in processed.tracks:
+        for msg in t:
+            if msg.is_meta and msg.type == 'track_name':
+                track_titles.append(msg.name)
+
+    assert any("Clean Electric Guitar" in name for name in track_titles), "Clean Electric Guitar track missing!"
+    assert any("Distorted Electric Guitar" in name for name in track_titles), "Distorted Electric Guitar track missing!"
+    assert any("Electric Bass" in name for name in track_titles), "Electric Bass track missing!"
+
+    print("✓ Guitar & Bass separation test passed: Distortion, Clean, and Bass isolated onto distinct staves")
+
+
 if __name__ == "__main__":
     test_key_signature_detection()
     test_time_signature_and_tempo_embedding()
@@ -194,4 +306,7 @@ if __name__ == "__main__":
     test_quantization_no_tuplets()
     test_single_voice_monophonic_resolution()
     test_channel_separation_to_tracks()
+    test_piano_grand_staff_and_polyphony()
+    test_drums_full_kit_polyphony()
+    test_guitar_clean_and_distortion_separation()
     print("\nALL MIDI PROCESSOR TESTS PASSED!")
