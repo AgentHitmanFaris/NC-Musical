@@ -192,67 +192,78 @@ def export_midi_to_musicxml(
                 ET.SubElement(note_elem, 'voice').text = "1"
                 ET.SubElement(note_elem, 'type').text = "whole" if time_sig_num == 4 else "half"
             else:
-                # Sort measure notes by onset
-                m_notes.sort(key=lambda x: (x['rel_start'], x['pitch']))
-                prev_pos = 0
-
+                from collections import defaultdict
+                onset_map = defaultdict(list)
                 for n_info in m_notes:
-                    onset = n_info['rel_start']
-                    dur = n_info['dur']
+                    onset_map[n_info['rel_start']].append(n_info)
 
-                    # Insert rest if there is a gap before note
-                    if onset > prev_pos:
-                        gap_dur = onset - prev_pos
+                sorted_onsets = sorted(onset_map.keys())
+                curr_pos = 0
+
+                for i, onset in enumerate(sorted_onsets):
+                    chord_notes = onset_map[onset]
+                    next_onset = sorted_onsets[i + 1] if i + 1 < len(sorted_onsets) else ticks_per_bar
+
+                    # Insert rest if there is a gap before note/chord
+                    if onset > curr_pos:
+                        gap_dur = onset - curr_pos
                         rest_elem = ET.SubElement(measure, 'note')
                         ET.SubElement(rest_elem, 'rest')
                         ET.SubElement(rest_elem, 'duration').text = str(gap_dur)
                         ET.SubElement(rest_elem, 'voice').text = "1"
-                        prev_pos = onset
+                        curr_pos = onset
 
-                    # Write pitch note
-                    note_elem = ET.SubElement(measure, 'note')
-                    if onset < prev_pos:
-                        # Simultaneous note (chord)
-                        ET.SubElement(note_elem, 'chord')
-                    else:
-                        prev_pos = onset + dur
+                    # Duration of this event in the single-voice timeline
+                    max_available_dur = max(1, next_onset - onset)
+                    raw_dur = min([n['dur'] for n in chord_notes])
+                    event_dur = max(1, min(raw_dur, max_available_dur))
 
-                    if is_drums:
-                        unpitched = ET.SubElement(note_elem, 'unpitched')
-                        ET.SubElement(unpitched, 'display-step').text = 'E'
-                        ET.SubElement(unpitched, 'display-octave').text = '4'
-                    else:
-                        pitch_elem = ET.SubElement(note_elem, 'pitch')
-                        p_val = n_info['pitch']
-                        octave = (p_val // 12) - 1
-                        step = _STEP_NAMES[p_val % 12]
-                        alter = _ALTER_VALS[p_val % 12]
+                    for idx, n_info in enumerate(chord_notes):
+                        note_elem = ET.SubElement(measure, 'note')
+                        if idx > 0:
+                            # Simultaneous notes with identical onset are valid MusicXML chords
+                            ET.SubElement(note_elem, 'chord')
 
-                        ET.SubElement(pitch_elem, 'step').text = step
-                        if alter != 0:
-                            ET.SubElement(pitch_elem, 'alter').text = str(alter)
-                        ET.SubElement(pitch_elem, 'octave').text = str(octave)
+                        if is_drums:
+                            unpitched = ET.SubElement(note_elem, 'unpitched')
+                            ET.SubElement(unpitched, 'display-step').text = 'E'
+                            ET.SubElement(unpitched, 'display-octave').text = '4'
+                        else:
+                            pitch_elem = ET.SubElement(note_elem, 'pitch')
+                            p_val = n_info['pitch']
+                            octave = (p_val // 12) - 1
+                            step = _STEP_NAMES[p_val % 12]
+                            alter = _ALTER_VALS[p_val % 12]
 
-                    ET.SubElement(note_elem, 'duration').text = str(max(1, dur))
-                    ET.SubElement(note_elem, 'voice').text = "1"
+                            ET.SubElement(pitch_elem, 'step').text = step
+                            if alter != 0:
+                                ET.SubElement(pitch_elem, 'alter').text = str(alter)
+                            ET.SubElement(pitch_elem, 'octave').text = str(octave)
 
-                    # Calculate note type string
-                    quarter_fraction = dur / ticks_per_beat
-                    if quarter_fraction >= 3.5:
-                        ntype = "whole"
-                    elif quarter_fraction >= 1.75:
-                        ntype = "half"
-                    elif quarter_fraction >= 0.85:
-                        ntype = "quarter"
-                    elif quarter_fraction >= 0.4:
-                        ntype = "eighth"
-                    else:
-                        ntype = "16th"
-                    ET.SubElement(note_elem, 'type').text = ntype
+                        ET.SubElement(note_elem, 'duration').text = str(event_dur)
+                        ET.SubElement(note_elem, 'voice').text = "1"
 
-                # Fill trailing rest if measure not full
-                if prev_pos < ticks_per_bar:
-                    tail_dur = ticks_per_bar - prev_pos
+                        # Calculate note type string
+                        quarter_fraction = event_dur / ticks_per_beat
+                        if quarter_fraction >= 3.5:
+                            ntype = "whole"
+                        elif quarter_fraction >= 1.75:
+                            ntype = "half"
+                        elif quarter_fraction >= 0.85:
+                            ntype = "quarter"
+                        elif quarter_fraction >= 0.4:
+                            ntype = "eighth"
+                        elif quarter_fraction >= 0.2:
+                            ntype = "16th"
+                        else:
+                            ntype = "32nd"
+                        ET.SubElement(note_elem, 'type').text = ntype
+
+                    curr_pos = onset + event_dur
+
+                # Fill trailing rest if measure is not complete
+                if curr_pos < ticks_per_bar:
+                    tail_dur = ticks_per_bar - curr_pos
                     rest_elem = ET.SubElement(measure, 'note')
                     ET.SubElement(rest_elem, 'rest')
                     ET.SubElement(rest_elem, 'duration').text = str(tail_dur)
