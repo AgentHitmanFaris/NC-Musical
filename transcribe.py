@@ -95,10 +95,13 @@ def main():
         print("Note: HF_TOKEN environment variable is not set. If the model fails to download,")
         print("please log in using 'huggingface-cli login' or set the HF_TOKEN environment variable.")
 
-    print(f"Loading MuScriptor model '{model_size}'...")
+    # Normalize model size keyword ('large', 'medium', 'small')
+    weights_key = "small" if "small" in str(model_size).lower() else ("medium" if "medium" in str(model_size).lower() else "large")
+
+    print(f"Loading MuScriptor model '{weights_key}'...")
     try:
         from muscriptor import TranscriptionModel
-        model = TranscriptionModel.load_model(weights_path=model_size, device=device)
+        model = TranscriptionModel.load_model(weights_path=weights_key, device=device)
         print("Model loaded successfully!")
     except Exception as e:
         print(f"Error loading model: {e}")
