@@ -6,10 +6,12 @@ from pathlib import Path
 
 try:
     from midi_processor import postprocess_midi, parse_time_signature_string
+    from musicxml_exporter import export_midi_to_musicxml
 except ImportError:
     # Fallback to local import
     sys.path.insert(0, str(Path(__file__).parent))
     from midi_processor import postprocess_midi, parse_time_signature_string
+    from musicxml_exporter import export_midi_to_musicxml
 
 
 def main():
@@ -45,6 +47,8 @@ def main():
     parser.add_argument("--fill-gaps", type=float, default=0.25, help="Hold notes across rests up to this beat fraction to eliminate messy notation rests")
     parser.add_argument("--trim-leading-bars", action="store_true", default=False, help="Drop empty leading measures before the first note")
     parser.add_argument("--instruments", nargs="*", default=None, help="Optional instrument filter list (e.g. acoustic_piano clean_electric_guitar)")
+    parser.add_argument("--musicxml", dest="export_musicxml", action="store_true", default=True, help="Export clean MusicXML file for MuseScore (Grand Staff piano, Voice 1 vocal)")
+    parser.add_argument("--no-musicxml", dest="export_musicxml", action="store_false", help="Disable MusicXML export")
 
     args = parser.parse_args()
 
@@ -119,7 +123,7 @@ def main():
 
         # Apply robust musical timing, key signature, tempo, single-voice, and tuplet-free quantization
         print("Applying post-processing (Time Signature, Key Signature, Tempo, Single Voice & Quantization)...")
-        _, final_midi_bytes, meta = postprocess_midi(
+        final_mid, final_midi_bytes, meta = postprocess_midi(
             midi_source=raw_midi_bytes,
             output_path=output_midi_path,
             bpm=args.bpm,
@@ -136,9 +140,27 @@ def main():
             separate_channels=args.separate_tracks
         )
 
+        musicxml_path = None
+        if args.export_musicxml:
+            musicxml_path = Path(output_midi_path).with_suffix(".musicxml")
+            try:
+                export_midi_to_musicxml(
+                    final_mid,
+                    output_xml_path=musicxml_path,
+                    title=Path(audio_path).stem,
+                    bpm=meta['bpm'],
+                    time_sig_num=meta['beats_per_bar'],
+                    time_sig_denom=meta['time_sig_denom'],
+                    key_signature=meta['key_signature']
+                )
+            except Exception as xml_err:
+                print(f"Notice: MusicXML export encountered: {xml_err}")
+
         print("━" * 60)
         print("✅ Transcription Complete!")
         print(f" • Output MIDI:     {output_midi_path}")
+        if musicxml_path and musicxml_path.exists():
+            print(f" • Output MusicXML: {musicxml_path}")
         print(f" • Time Signature: {meta['time_signature']}")
         print(f" • Key Signature:  {meta['key_signature']}")
         print(f" • Tempo (BPM):    {meta['bpm']:.1f}")
