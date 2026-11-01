@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 from pathlib import Path
 
 def patch_file(file_path: Path, target_content: str, replacement_content: str):
@@ -163,43 +164,17 @@ def instrument_group_from_names(names: Iterable[str]) -> str:
 
     patch_file(mt3_path, target_mt3, replacement_mt3)
 
-    # Patch transcription_model.py to support friendly model names in load_model
+    # Ensure transcription_model.py is clean and uncorrupted
     tm_path = muscriptor_dir / "transcription_model.py"
     if tm_path.exists():
         try:
             tm_content = tm_path.read_text(encoding="utf-8")
-            if "_resolve_model_name(" not in tm_content and "def load_model(" in tm_content:
-                resolver_code = """
-def _resolve_model_name(name):
-    if isinstance(name, str):
-        n = name.strip().lower()
-        if n in ("small", "medium", "large"):
-            return n
-        if "small" in n:
-            return "small"
-        if "medium" in n:
-            return "medium"
-        if "large" in n:
-            return "large"
-    return name
-
-"""
-                tm_content = resolver_code + tm_content
-                tm_content = tm_content.replace(
-                    "def load_model(cls, weights_path",
-                    "def load_model(cls, weights_path"
-                )
-                # Ensure load_model resolves weights_path
-                lines = tm_content.splitlines(True)
-                new_lines = []
-                for line in lines:
-                    new_lines.append(line)
-                    if line.strip().startswith("def load_model(") or "def load_model(" in line and line.rstrip().endswith(":"):
-                        new_lines.append("        weights_path = _resolve_model_name(weights_path)\n")
-                tm_path.write_text("".join(new_lines), encoding="utf-8")
-                print("Successfully patched: transcription_model.py (friendly model names enabled)")
+            if "_resolve_model_name" in tm_content:
+                print("Detected corrupted transcription_model.py, restoring clean package...")
+                subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps", "-q", "muscriptor"])
+                print("✓ Restored clean muscriptor package.")
         except Exception as e:
-            print(f"Notice: transcription_model.py patch skipped ({e})")
+            print(f"Notice during muscriptor package integrity check: {e}")
 
     # Harden beat-tracking and tempo-detection loaders against memory limits & missing checkpoints
     print("Hardening AI tempo & beat tracking loaders against memory limits...")
