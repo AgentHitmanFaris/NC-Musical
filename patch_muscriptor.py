@@ -7,7 +7,7 @@ def patch_file(file_path: Path, target_content: str, replacement_content: str):
     if not file_path.exists():
         print(f"Error: File {file_path} not found. Cannot patch.")
         return False
-        
+
     content = file_path.read_text(encoding="utf-8")
     if target_content in content:
         new_content = content.replace(target_content, replacement_content)
@@ -21,23 +21,73 @@ def patch_file(file_path: Path, target_content: str, replacement_content: str):
         print(f"Warning: Could not find target content in {file_path.name}. It may have been modified.")
         return False
 
-def main():
-    muscriptor_dir = None
+def repair_transcription_model(muscriptor_dir: Path):
+    """Repair and clean any corrupted lines from transcription_model.py on disk."""
+    tm_path = muscriptor_dir / "transcription_model.py"
+    if tm_path.exists():
+        try:
+            txt = tm_path.read_text(encoding="utf-8")
+            if "_resolve_model_name" in txt:
+                clean_lines = [
+                    l for l in txt.splitlines(True)
+                    if "_resolve_model_name" not in l
+                    and "def _resolve_model_name" not in l
+                    and "if isinstance(name, str):" not in l
+                    and "n = name.strip().lower()" not in l
+                    and 'if n in ("small", "medium", "large"):' not in l
+                    and 'if "small" in n:' not in l
+                    and 'if "medium" in n:' not in l
+                    and 'if "large" in n:' not in l
+                    and "return n" not in l
+                    and 'return "small"' not in l
+                    and 'return "medium"' not in l
+                    and 'return "large"' not in l
+                    and "return name" not in l
+                ]
+                tm_path.write_text("".join(clean_lines), encoding="utf-8")
+                print("✓ Successfully repaired and restored clean transcription_model.py on disk.")
+        except Exception as e:
+            print(f"Repair notice: {e}")
+
+def locate_muscriptor_dir() -> Path | None:
+    """Find muscriptor directory safely without triggering SyntaxError from broken files."""
+    search_dirs = []
+    try:
+        import site
+        search_dirs.extend([Path(p) for p in site.getsitepackages()])
+        search_dirs.append(Path(site.getusersitepackages()))
+    except Exception:
+        pass
+    search_dirs.extend([Path(p) for p in sys.path if p])
+
+    for sp in search_dirs:
+        cand = sp / "muscriptor"
+        if cand.exists() and (cand / "__init__.py").exists():
+            return cand
+
+    workspace = Path(__file__).parent
+    candidates = list(workspace.glob("venv/**/muscriptor"))
+    if candidates:
+        return candidates[0]
+
     try:
         import muscriptor
-        muscriptor_dir = Path(muscriptor.__file__).parent
-        print(f"Located muscriptor package at: {muscriptor_dir}")
-    except ImportError:
-        # Fallback search for venv or site-packages
-        workspace = Path(__file__).parent
-        candidates = list(workspace.glob("venv/**/muscriptor"))
-        if candidates:
-            muscriptor_dir = candidates[0]
-            print(f"Located muscriptor package in venv at: {muscriptor_dir}")
+        return Path(muscriptor.__file__).parent
+    except Exception:
+        pass
 
+    return None
+
+def main():
+    muscriptor_dir = locate_muscriptor_dir()
     if not muscriptor_dir or not muscriptor_dir.exists():
         print("Notice: 'muscriptor' package is not installed yet. Skipping patch.")
         return
+
+    print(f"Located muscriptor package at: {muscriptor_dir}")
+
+    # Immediately repair transcription_model.py on disk before any imports occur
+    repair_transcription_model(muscriptor_dir)
 
     # Patch auralization.py
     auralization_path = muscriptor_dir / "utils" / "auralization.py"
@@ -163,18 +213,6 @@ def instrument_group_from_names(names: Iterable[str]) -> str:
     return " ".join(str(MT3_FULL_PLUS_GROUP_NAMES[n]) for n in resolved_names)"""
 
     patch_file(mt3_path, target_mt3, replacement_mt3)
-
-    # Ensure transcription_model.py is clean and uncorrupted
-    tm_path = muscriptor_dir / "transcription_model.py"
-    if tm_path.exists():
-        try:
-            tm_content = tm_path.read_text(encoding="utf-8")
-            if "_resolve_model_name" in tm_content:
-                print("Detected corrupted transcription_model.py, restoring clean package...")
-                subprocess.run([sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps", "-q", "muscriptor"])
-                print("✓ Restored clean muscriptor package.")
-        except Exception as e:
-            print(f"Notice during muscriptor package integrity check: {e}")
 
     # Harden beat-tracking and tempo-detection loaders against memory limits & missing checkpoints
     print("Hardening AI tempo & beat tracking loaders against memory limits...")
