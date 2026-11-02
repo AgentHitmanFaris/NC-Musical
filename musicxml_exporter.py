@@ -1,3 +1,4 @@
+import re
 import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -30,6 +31,115 @@ _KEY_FIFTHS = {
 }
 
 
+def parse_chord_to_musicxml_harmony(chord_str: str) -> ET.Element | None:
+    """Convert chord symbol (e.g. 'Ebmaj7', 'Cm7', 'Fm7', 'Bb7', 'G/B') into standard MusicXML <harmony>."""
+    if not chord_str or not isinstance(chord_str, str):
+        return None
+    clean = chord_str.strip()
+    if not clean:
+        return None
+
+    bass_note = None
+    if '/' in clean:
+        parts = clean.split('/', 1)
+        clean = parts[0].strip()
+        bass_note = parts[1].strip()
+
+    m = re.match(r'^([A-G])([b#]?)(.*)', clean)
+    if not m:
+        return None
+    step, accidental, quality = m.groups()
+
+    harmony = ET.Element('harmony', attrib={'default-y': '35'})
+    root_elem = ET.SubElement(harmony, 'root')
+    ET.SubElement(root_elem, 'root-step').text = step
+    if accidental == 'b':
+        ET.SubElement(root_elem, 'root-alter').text = '-1'
+    elif accidental == '#':
+        ET.SubElement(root_elem, 'root-alter').text = '1'
+
+    kind_elem = ET.SubElement(harmony, 'kind')
+    kind_elem.set('text', chord_str)
+    q_lower = quality.lower()
+    if 'maj7' in q_lower or 'major7' in q_lower or 'm7+' in q_lower:
+        kind_elem.text = 'major-seventh'
+    elif 'm7' in q_lower or 'min7' in q_lower or 'minor7' in q_lower:
+        kind_elem.text = 'minor-seventh'
+    elif 'dim7' in q_lower:
+        kind_elem.text = 'diminished-seventh'
+    elif 'dim' in q_lower:
+        kind_elem.text = 'diminished'
+    elif 'aug' in q_lower:
+        kind_elem.text = 'augmented'
+    elif 'sus4' in q_lower:
+        kind_elem.text = 'suspended-fourth'
+    elif 'sus2' in q_lower:
+        kind_elem.text = 'suspended-second'
+    elif '7' in q_lower:
+        kind_elem.text = 'dominant'
+    elif 'm' in q_lower or 'min' in q_lower:
+        kind_elem.text = 'minor'
+    else:
+        kind_elem.text = 'major'
+
+    if bass_note:
+        bm = re.match(r'^([A-G])([b#]?)', bass_note)
+        if bm:
+            b_step, b_acc = bm.groups()
+            bass_elem = ET.SubElement(harmony, 'bass')
+            ET.SubElement(bass_elem, 'bass-step').text = b_step
+            if b_acc == 'b':
+                ET.SubElement(bass_elem, 'bass-alter').text = '-1'
+            elif b_acc == '#':
+                ET.SubElement(bass_elem, 'bass-alter').text = '1'
+
+    return harmony
+
+
+def _get_measure_chords(chords: dict | list | None, m_idx: int, ticks_per_bar: int) -> list[tuple[int, str]]:
+    """Resolve chord symbols for measure m_idx (1-based).
+    
+    Returns list of (tick_offset, chord_name) tuples within the measure.
+    """
+    if not chords:
+        return []
+
+    val = None
+    if isinstance(chords, (list, tuple)):
+        idx = m_idx - 1
+        if 0 <= idx < len(chords):
+            val = chords[idx]
+    elif isinstance(chords, dict):
+        val = chords.get(m_idx)
+        if val is None:
+            val = chords.get(m_idx - 1)
+
+    if not val:
+        return []
+
+    if isinstance(val, (list, tuple)):
+        # Could be list of (offset, chord_name) or list of chord names
+        res = []
+        if val and isinstance(val[0], (list, tuple)) and len(val[0]) == 2:
+            return [(int(off), str(c)) for off, c in val if c]
+        else:
+            tokens = [str(x).strip() for x in val if str(x).strip()]
+            if not tokens:
+                return []
+            step = ticks_per_bar // len(tokens)
+            return [(i * step, tok) for i, tok in enumerate(tokens)]
+
+    if isinstance(val, str):
+        # Space or comma separated chords in a measure, e.g. "Fm7 Bb7" or "Ebmaj7"
+        tokens = [t.strip() for t in re.split(r'[, ]+', val) if t.strip()]
+        if not tokens:
+            return []
+        step = ticks_per_bar // len(tokens)
+        return [(i * step, tok) for i, tok in enumerate(tokens)]
+
+    return []
+
+
 def export_midi_to_musicxml(
     mid: mido.MidiFile,
     output_xml_path: str | Path,
@@ -38,7 +148,8 @@ def export_midi_to_musicxml(
     time_sig_num: int = 4,
     time_sig_denom: int = 4,
     key_signature: str | None = "C",
-    lyrics: str | Path | list[dict] | None = None
+    lyrics: str | Path | list[dict] | None = None,
+    chords: dict[int, str | list] | list[str] | None = None
 ) -> Path:
     """Export a multi-track MidiFile into a clean, well-formatted MusicXML file for MuseScore.
     
@@ -154,19 +265,51 @@ def export_midi_to_musicxml(
         max_tick = max([n['end'] for n in note_pairs], default=ticks_per_bar)
         num_measures = max(1, int(math.ceil(max_tick / ticks_per_bar)))
 
-        # Group notes by measure
+        # Group notes by measure, slicing across barline boundaries into tied note pairs
         measure_notes = {m_idx: [] for m_idx in range(1, num_measures + 1)}
         for n in note_pairs:
-            m_idx = (n['start'] // ticks_per_bar) + 1
-            if m_idx <= num_measures:
-                rel_start = n['start'] % ticks_per_bar
-                measure_notes[m_idx].append({
-                    'pitch': n['pitch'],
-                    'rel_start': rel_start,
-                    'dur': min(n['dur'], ticks_per_bar - rel_start),
-                    'vel': n['vel'],
-                    'lyric': n.get('lyric')
-                })
+            st = n['start']
+            et = n['end']
+            if et <= st:
+                et = st + 1
+            m_start = (st // ticks_per_bar) + 1
+            m_end = ((et - 1) // ticks_per_bar) + 1
+
+            if m_start == m_end:
+                if m_start <= num_measures:
+                    rel_start = st % ticks_per_bar
+                    measure_notes[m_start].append({
+                        'pitch': n['pitch'],
+                        'rel_start': rel_start,
+                        'dur': et - st,
+                        'vel': n['vel'],
+                        'lyric': n.get('lyric'),
+                        'tie_start': False,
+                        'tie_stop': False
+                    })
+            else:
+                for m in range(m_start, m_end + 1):
+                    if m > num_measures:
+                        break
+                    bar_start = (m - 1) * ticks_per_bar
+                    bar_end = m * ticks_per_bar
+                    cur_st = max(st, bar_start)
+                    cur_et = min(et, bar_end)
+                    slice_dur = max(1, cur_et - cur_st)
+                    is_first = (m == m_start)
+                    is_last = (m == m_end)
+
+                    measure_notes[m].append({
+                        'pitch': n['pitch'],
+                        'rel_start': cur_st - bar_start,
+                        'dur': slice_dur,
+                        'vel': n['vel'],
+                        'lyric': n.get('lyric') if is_first else None,
+                        'tie_start': not is_last,
+                        'tie_stop': not is_first
+                    })
+
+        is_primary_part = (pid == "P1") or is_vocal
 
         for m_idx in range(1, num_measures + 1):
             measure = ET.SubElement(part, 'measure', number=str(m_idx))
@@ -210,8 +353,18 @@ def export_midi_to_musicxml(
                 sound = ET.SubElement(direction, 'sound')
                 sound.set('tempo', str(int(round(bpm))))
 
+            # Chord symbols (placed on top staff P1)
+            measure_chords = []
+            if is_primary_part and chords:
+                measure_chords = _get_measure_chords(chords, m_idx, ticks_per_bar)
+
             m_notes = measure_notes[m_idx]
             if not m_notes:
+                # Insert any chords for empty measure
+                for c_off, c_name in measure_chords:
+                    h_elem = parse_chord_to_musicxml_harmony(c_name)
+                    if h_elem is not None:
+                        measure.append(h_elem)
                 # Whole measure rest
                 note_elem = ET.SubElement(measure, 'note')
                 ET.SubElement(note_elem, 'rest')
@@ -226,8 +379,16 @@ def export_midi_to_musicxml(
 
                 sorted_onsets = sorted(onset_map.keys())
                 curr_pos = 0
+                chord_idx = 0
 
                 for i, onset in enumerate(sorted_onsets):
+                    # Emit any chord symbols that occur before or at this onset
+                    while chord_idx < len(measure_chords) and measure_chords[chord_idx][0] <= onset:
+                        h_elem = parse_chord_to_musicxml_harmony(measure_chords[chord_idx][1])
+                        if h_elem is not None:
+                            measure.append(h_elem)
+                        chord_idx += 1
+
                     chord_notes = onset_map[onset]
                     next_onset = sorted_onsets[i + 1] if i + 1 < len(sorted_onsets) else ticks_per_bar
 
@@ -268,6 +429,16 @@ def export_midi_to_musicxml(
                             ET.SubElement(pitch_elem, 'octave').text = str(octave)
 
                         ET.SubElement(note_elem, 'duration').text = str(event_dur)
+
+                        # Ties
+                        if n_info.get('tie_stop') and n_info.get('tie_start'):
+                            ET.SubElement(note_elem, 'tie', attrib={'type': 'stop'})
+                            ET.SubElement(note_elem, 'tie', attrib={'type': 'start'})
+                        elif n_info.get('tie_stop'):
+                            ET.SubElement(note_elem, 'tie', attrib={'type': 'stop'})
+                        elif n_info.get('tie_start'):
+                            ET.SubElement(note_elem, 'tie', attrib={'type': 'start'})
+
                         ET.SubElement(note_elem, 'voice').text = "1"
 
                         # Calculate note type string
@@ -286,6 +457,14 @@ def export_midi_to_musicxml(
                             ntype = "32nd"
                         ET.SubElement(note_elem, 'type').text = ntype
 
+                        # Notations (tied curves)
+                        if n_info.get('tie_stop') or n_info.get('tie_start'):
+                            notations = ET.SubElement(note_elem, 'notations')
+                            if n_info.get('tie_stop'):
+                                ET.SubElement(notations, 'tied', attrib={'type': 'stop'})
+                            if n_info.get('tie_start'):
+                                ET.SubElement(notations, 'tied', attrib={'type': 'start'})
+
                         # Direct sheet music lyrics underlay (primary note of event)
                         if idx == 0 and n_info.get('lyric'):
                             lyric_obj = n_info['lyric']
@@ -295,8 +474,17 @@ def export_midi_to_musicxml(
                                 lyric_elem = ET.SubElement(note_elem, 'lyric', number="1")
                                 ET.SubElement(lyric_elem, 'syllabic').text = syl_type
                                 ET.SubElement(lyric_elem, 'text').text = syl_txt
+                                if n_info.get('tie_start'):
+                                    ET.SubElement(lyric_elem, 'extend')
 
                     curr_pos = onset + event_dur
+
+                # Emit any remaining chords for the measure
+                while chord_idx < len(measure_chords):
+                    h_elem = parse_chord_to_musicxml_harmony(measure_chords[chord_idx][1])
+                    if h_elem is not None:
+                        measure.append(h_elem)
+                    chord_idx += 1
 
                 # Fill trailing rest if measure is not complete
                 if curr_pos < ticks_per_bar:
