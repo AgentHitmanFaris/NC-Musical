@@ -3,6 +3,13 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 import mido
 
+try:
+    from lyrics_aligner import align_lyrics_to_notes, parse_lyrics
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from lyrics_aligner import align_lyrics_to_notes, parse_lyrics
+
 _STEP_NAMES = ['C', 'C', 'D', 'D', 'E', 'F', 'F', 'G', 'G', 'A', 'A', 'B']
 _ALTER_VALS = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]
 
@@ -30,11 +37,13 @@ def export_midi_to_musicxml(
     bpm: float = 120.0,
     time_sig_num: int = 4,
     time_sig_denom: int = 4,
-    key_signature: str | None = "C"
+    key_signature: str | None = "C",
+    lyrics: str | Path | list[dict] | None = None
 ) -> Path:
     """Export a multi-track MidiFile into a clean, well-formatted MusicXML file for MuseScore.
     
     Guarantees:
+      - Direct Lyrics Underlay on notes in the vocal/lead melody staff.
       - Grand Staff (Treble on top, Bass on bottom) for Piano.
       - Treble Clef & Voice 1 for Vocals (strictly no 2-voicing).
       - Percussion Clef on 5-line staff for Drums.
@@ -98,12 +107,16 @@ def export_midi_to_musicxml(
         is_drums = ("drum" in tname_lower)
         is_vocal = ("vocal" in tname_lower) or ("voice" in tname_lower)
 
-        # Extract notes with absolute tick times
+        # Extract notes and track-embedded lyrics with absolute tick times
         abs_events = []
+        track_lyrics = {}
         curr_tick = 0
         for msg in track:
             curr_tick += msg.time
-            if not msg.is_meta:
+            if msg.is_meta:
+                if msg.type == 'lyrics' and getattr(msg, 'text', None):
+                    track_lyrics[curr_tick] = msg.text
+            else:
                 abs_events.append((curr_tick, msg))
 
         active = {}
@@ -114,15 +127,28 @@ def export_midi_to_musicxml(
             elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
                 if msg.note in active and active[msg.note]:
                     st, on_m = active[msg.note].pop(0)
+                    lyric_obj = None
+                    if st in track_lyrics:
+                        txt_val = track_lyrics[st]
+                        syl_val = 'single'
+                        if txt_val.endswith('-'):
+                            txt_val = txt_val[:-1]
+                            syl_val = 'begin'
+                        lyric_obj = {'text': txt_val, 'syllabic': syl_val}
                     note_pairs.append({
                         'pitch': msg.note,
                         'start': st,
                         'end': max(st + 1, atick),
                         'dur': max(1, atick - st),
-                        'vel': on_m.velocity
+                        'vel': on_m.velocity,
+                        'lyric': lyric_obj
                     })
 
         note_pairs.sort(key=lambda n: (n['start'], n['pitch']))
+
+        # If lyrics were provided explicitly and track is vocal or lead part, align them onto notes
+        if lyrics and (is_vocal or len(track_entries) == 1):
+            note_pairs = align_lyrics_to_notes(note_pairs, lyrics, ticks_per_beat=ticks_per_beat, bpm=bpm)
 
         # Determine total measures required
         max_tick = max([n['end'] for n in note_pairs], default=ticks_per_bar)
@@ -138,7 +164,8 @@ def export_midi_to_musicxml(
                     'pitch': n['pitch'],
                     'rel_start': rel_start,
                     'dur': min(n['dur'], ticks_per_bar - rel_start),
-                    'vel': n['vel']
+                    'vel': n['vel'],
+                    'lyric': n.get('lyric')
                 })
 
         for m_idx in range(1, num_measures + 1):
@@ -258,6 +285,16 @@ def export_midi_to_musicxml(
                         else:
                             ntype = "32nd"
                         ET.SubElement(note_elem, 'type').text = ntype
+
+                        # Direct sheet music lyrics underlay (primary note of event)
+                        if idx == 0 and n_info.get('lyric'):
+                            lyric_obj = n_info['lyric']
+                            syl_txt = lyric_obj.get('text', '') if isinstance(lyric_obj, dict) else str(lyric_obj)
+                            syl_type = lyric_obj.get('syllabic', 'single') if isinstance(lyric_obj, dict) else 'single'
+                            if syl_txt:
+                                lyric_elem = ET.SubElement(note_elem, 'lyric', number="1")
+                                ET.SubElement(lyric_elem, 'syllabic').text = syl_type
+                                ET.SubElement(lyric_elem, 'text').text = syl_txt
 
                     curr_pos = onset + event_dur
 

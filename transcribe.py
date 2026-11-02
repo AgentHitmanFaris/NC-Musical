@@ -41,6 +41,8 @@ def main():
     parser.add_argument("--single-voice", dest="single_voice", action="store_true", default=True, help="Force strictly 1 clean voice (Voice 1 in MuseScore) with ZERO overlaps (no Moonlight Sonata 2-voicing)")
     parser.add_argument("--polyphonic", dest="single_voice", action="store_false", help="Allow polyphonic simultaneous chords (may produce multiple voices in MuseScore)")
     parser.add_argument("--separate-tracks", action="store_true", default=True, help="Separate each instrument and channel into its own dedicated track/staff in MuseScore")
+    parser.add_argument("--restricted-triplets", dest="restricted_triplets", action="store_true", default=False, help="Enable restricted triplets: binary grid is priority, triplets used only when notes clearly fit them")
+    parser.add_argument("--no-restricted-triplets", dest="restricted_triplets", action="store_false", help="Disable restricted triplets (strict binary or specified grid)")
     parser.add_argument("--no-tuplets", action="store_true", default=True, help="Enforce straight binary grid (1/16 sixteenth notes, no triplets/tuplets)")
     parser.add_argument("--grid", type=int, default=4, help="Grid subdivision per beat (4 = 1/16 sixteenths, 2 = 1/8 eighths, 3 = triplets, 8 = 1/32)")
     parser.add_argument("--quantize-strength", type=float, default=1.0, help="Quantization strength from 0.0 (no snap) to 1.0 (strict snap)")
@@ -49,6 +51,8 @@ def main():
     parser.add_argument("--instruments", nargs="*", default=None, help="Optional instrument filter list (e.g. acoustic_piano clean_electric_guitar)")
     parser.add_argument("--musicxml", dest="export_musicxml", action="store_true", default=True, help="Export clean MusicXML file for MuseScore (Grand Staff piano, Voice 1 vocal)")
     parser.add_argument("--no-musicxml", dest="export_musicxml", action="store_false", help="Disable MusicXML export")
+    parser.add_argument("--lyrics", default=None, help="Path to lyrics file (.txt, .lrc, .srt, .vtt) to embed directly into notes")
+    parser.add_argument("--lyrics-text", default=None, help="Raw lyrics text string to embed directly into notes")
 
     args = parser.parse_args()
 
@@ -140,7 +144,9 @@ def main():
             trim_leading_bars=args.trim_leading_bars,
             beat_scale=args.beat_scale,
             single_voice=args.single_voice,
-            separate_channels=args.separate_tracks
+            separate_channels=args.separate_tracks,
+            restricted_triplets=args.restricted_triplets,
+            lyrics=args.lyrics_text if args.lyrics_text else args.lyrics
         )
 
         musicxml_path = None
@@ -154,7 +160,8 @@ def main():
                     bpm=meta['bpm'],
                     time_sig_num=meta['beats_per_bar'],
                     time_sig_denom=meta['time_sig_denom'],
-                    key_signature=meta['key_signature']
+                    key_signature=meta['key_signature'],
+                    lyrics=args.lyrics_text if args.lyrics_text else args.lyrics
                 )
             except Exception as xml_err:
                 print(f"Notice: MusicXML export encountered: {xml_err}")
@@ -167,9 +174,19 @@ def main():
         print(f" • Time Signature: {meta['time_signature']}")
         print(f" • Key Signature:  {meta['key_signature']}")
         print(f" • Tempo (BPM):    {meta['bpm']:.1f}")
-        print(f" • Quantization:   {'Enabled (No Tuplets - 1/16 Grid)' if meta.get('no_tuplets') else ('Enabled' if meta['quantized'] else 'Disabled')}")
+        quant_msg = "Disabled"
+        if meta.get('quantized'):
+            if meta.get('restricted_triplets'):
+                quant_msg = "Enabled (Restricted Triplets - Binary 1/16 Priority)"
+            elif meta.get('no_tuplets'):
+                quant_msg = "Enabled (No Tuplets - 1/16 Grid)"
+            else:
+                quant_msg = f"Enabled (Grid 1/{meta.get('grid_div', 4)})"
+        print(f" • Quantization:   {quant_msg}")
         print(f" • MuseScore Voice: {'Strict Single Voice (Clean Voice 1 - No 2-Voicing)' if meta.get('single_voice') else 'Polyphonic Multi-Voice'}")
         print(f" • Track Staves:   {'Separated per Instrument/Channel' if meta.get('separate_channels') else 'Original'}")
+        if args.lyrics or args.lyrics_text:
+            print(" • Lyrics:         Embedded directly under notes (MusicXML <lyric> & MIDI Meta)")
         print("━" * 60)
 
     except Exception as e:

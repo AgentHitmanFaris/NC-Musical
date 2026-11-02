@@ -1,6 +1,14 @@
 import io
 import math
+from pathlib import Path
 import mido
+
+try:
+    from lyrics_aligner import align_lyrics_to_notes, parse_lyrics
+except ImportError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    from lyrics_aligner import align_lyrics_to_notes, parse_lyrics
 
 # Krumhansl-Schmuckler Key Profiles (12 pitch classes: C, C#, D, Eb, E, F, F#, G, Ab, A, Bb, B)
 _MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
@@ -123,7 +131,7 @@ def detect_key_signature_from_midi(mid: mido.MidiFile) -> str:
     return best_key
 
 
-def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
+def separate_multichannel_tracks(mid: mido.MidiFile, lyrics: str | Path | list | None = None) -> mido.MidiFile:
     """Separate MIDI channels and instruments into dedicated staves for MuseScore.
     
     1. Piano is partitioned into a complete Grand Staff:
@@ -245,6 +253,12 @@ def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
         for n in notes:
             on_m = n['on_msg'].copy(channel=channel)
             off_m = n['off_msg'].copy(channel=channel)
+            if n.get('lyric'):
+                l_info = n['lyric']
+                txt = l_info['text'] if isinstance(l_info, dict) else str(l_info)
+                if isinstance(l_info, dict) and l_info.get('syllabic') in ('begin', 'middle'):
+                    txt = txt + "-"
+                events.append((n['start'], 0, mido.MetaMessage('lyrics', text=txt, time=0)))
             events.append((n['start'], 2, on_m))
             events.append((n['end'], 1, off_m))
         events.sort(key=lambda x: (x[0], x[1]))
@@ -258,7 +272,10 @@ def separate_multichannel_tracks(mid: mido.MidiFile) -> mido.MidiFile:
 
     # 1. Vocals Track (Channel 0, Program 54)
     if 'vocal' in note_events_by_group:
-        tr = _create_track("Vocals (Clean Voice 1)", 0, 54, note_events_by_group['vocal'])
+        vocal_notes = note_events_by_group['vocal']
+        if lyrics:
+            vocal_notes = align_lyrics_to_notes(vocal_notes, lyrics, ticks_per_beat=mid.ticks_per_beat or 480)
+        tr = _create_track("Vocals (Clean Voice 1)", 0, 54, vocal_notes)
         if tr: new_mid.tracks.append(tr)
 
     # 2. Piano Grand Staff: Treble Clef (RH >= 60) and Bass Clef (LH < 60)
@@ -431,7 +448,9 @@ def quantize_midi_tracks(
     beats_per_bar: int = 4,
     time_sig_denom: int = 4,
     single_voice: bool = True,
-    separate_channels: bool = True
+    separate_channels: bool = True,
+    restricted_triplets: bool = False,
+    lyrics: str | Path | list | None = None
 ) -> mido.MidiFile:
     """Snap note onsets and durations to the specified beat grid and eliminate multi-voicing.
     
@@ -441,6 +460,8 @@ def quantize_midi_tracks(
     grid_div=3: eighth triplets
     grid_div=6: sixteenth triplets
     
+    restricted_triplets=True: Straight binary grid is primary priority; triplets allowed
+                              only when notes clearly fit them, without forcing the entire piece.
     single_voice=True: Enforces strictly 1 clean voice (Voice 1 in MuseScore) with ZERO overlaps.
     separate_channels=True: Splits channels into dedicated tracks so MuseScore creates clean individual staves.
     """
@@ -455,8 +476,39 @@ def quantize_midi_tracks(
     fill_gap_ticks = int(round(fill_gaps_beats * ticks_per_beat_unit)) if fill_gaps_beats > 0 else 0
     ticks_per_bar = max(grid_ticks, int(round(ticks_per_beat_unit * beats_per_bar)))
 
+    # Determine triplet grid for restricted triplets mode
+    triplet_ticks = None
+    if restricted_triplets:
+        if grid_div in (3, 6, 12):
+            triplet_ticks = grid_ticks
+            base_binary_div = 4 if grid_div == 6 else (2 if grid_div == 3 else 8)
+            grid_ticks = max(1, int(round(ticks_per_beat_unit / base_binary_div)))
+        else:
+            triplet_div = int(round(grid_div * 1.5))
+            triplet_ticks = max(1, int(round(ticks_per_beat_unit / triplet_div)))
+
+    def _snap_tick_value(val: int, binary_step: int, triplet_step: int | None, allow_triplets: bool) -> int:
+        snapped_b = int(round(val / binary_step)) * binary_step
+        if not allow_triplets or triplet_step is None:
+            return snapped_b
+
+        snapped_t = int(round(val / triplet_step)) * triplet_step
+        err_b = abs(val - snapped_b)
+        err_t = abs(val - snapped_t)
+
+        # Straight binary grid is mandatory priority.
+        # If binary match is already close (within 12% of step), keep binary.
+        if err_b <= max(4, binary_step * 0.12):
+            return snapped_b
+
+        # Only accept triplet if it is a strong fit and noticeably better than binary
+        if err_t <= max(6, triplet_step * 0.25) and err_b > (err_t * 1.6 + binary_step * 0.10):
+            return snapped_t
+
+        return snapped_b
+
     # Step 1: Optionally separate channels to avoid multi-instrument collisions in a single staff
-    working_mid = separate_multichannel_tracks(mid) if separate_channels else mid
+    working_mid = separate_multichannel_tracks(mid, lyrics=lyrics) if separate_channels else mid
 
     # Step 2: Check leading empty bars
     shift_ticks = 0
@@ -484,22 +536,29 @@ def quantize_midi_tracks(
         active_notes = {}
         note_pairs = []
         other_events = []
+        track_lyrics = {}
 
         for atick, msg in abs_events:
-            if msg.type == 'note_on' and msg.velocity > 0:
+            if msg.is_meta and msg.type == 'lyrics' and getattr(msg, 'text', None):
+                track_lyrics[atick] = msg.text
+            elif msg.type == 'note_on' and msg.velocity > 0:
                 key = (msg.channel, msg.note)
                 active_notes.setdefault(key, []).append((atick, msg))
             elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
                 key = (msg.channel, msg.note)
                 if key in active_notes and active_notes[key]:
                     start_tick, on_msg = active_notes[key].pop(0)
+                    lyric_obj = None
+                    if start_tick in track_lyrics:
+                        lyric_obj = {'text': track_lyrics[start_tick], 'syllabic': 'single'}
                     note_pairs.append({
                         'channel': msg.channel,
                         'pitch': msg.note,
                         'start': start_tick,
                         'end': atick,
                         'on_msg': on_msg,
-                        'off_msg': msg
+                        'off_msg': msg,
+                        'lyric': lyric_obj
                     })
                 else:
                     other_events.append((atick, msg))
@@ -509,13 +568,15 @@ def quantize_midi_tracks(
         # Close any lingering open notes
         for key, unclosed in active_notes.items():
             for start_tick, on_msg in unclosed:
+                lyric_obj = {'text': track_lyrics[start_tick], 'syllabic': 'single'} if start_tick in track_lyrics else None
                 note_pairs.append({
                     'channel': key[0],
                     'pitch': key[1],
                     'start': start_tick,
                     'end': start_tick + grid_ticks,
                     'on_msg': on_msg,
-                    'off_msg': mido.Message('note_off', channel=key[0], note=key[1], velocity=0, time=0)
+                    'off_msg': mido.Message('note_off', channel=key[0], note=key[1], velocity=0, time=0),
+                    'lyric': lyric_obj
                 })
 
         if not note_pairs:
@@ -548,6 +609,8 @@ def quantize_midi_tracks(
                 grid_ticks=grid_ticks,
                 fill_gap_ticks=fill_gap_ticks
             )
+            if lyrics and not any(n.get('lyric') for n in note_pairs):
+                note_pairs = align_lyrics_to_notes(note_pairs, lyrics, ticks_per_beat=ticks_per_beat)
         elif is_bass_track and single_voice:
             note_pairs = clean_monophonic_voice(
                 note_pairs,
@@ -568,16 +631,18 @@ def quantize_midi_tracks(
 
         # Quantize onsets and durations
         quantized_notes = []
+        min_step = min(grid_ticks, triplet_ticks) if (restricted_triplets and triplet_ticks) else grid_ticks
         for n in note_pairs:
             orig_start = n['start']
             orig_dur = max(1, n['end'] - n['start'])
 
-            snapped_start = int(round(orig_start / grid_ticks)) * grid_ticks
+            snapped_start = _snap_tick_value(orig_start, grid_ticks, triplet_ticks, restricted_triplets)
             new_start = int(round(orig_start + (snapped_start - orig_start) * quantize_strength))
             new_start = max(0, new_start - shift_ticks)
 
-            snapped_dur = max(grid_ticks, int(round(orig_dur / grid_ticks)) * grid_ticks)
-            new_dur = max(grid_ticks // 2, int(round(orig_dur + (snapped_dur - orig_dur) * quantize_strength)))
+            snapped_dur = _snap_tick_value(orig_dur, grid_ticks, triplet_ticks, restricted_triplets)
+            snapped_dur = max(min_step, snapped_dur)
+            new_dur = max(min_step // 2, int(round(orig_dur + (snapped_dur - orig_dur) * quantize_strength)))
             new_end = new_start + new_dur
 
             quantized_notes.append({
@@ -586,7 +651,8 @@ def quantize_midi_tracks(
                 'start': new_start,
                 'end': new_end,
                 'on_msg': n['on_msg'],
-                'off_msg': n['off_msg']
+                'off_msg': n['off_msg'],
+                'lyric': n.get('lyric')
             })
 
         # CRITICAL: Post-quantization non-overlap guarantee ONLY for monophonic tracks (Vocals & Bass)
@@ -615,6 +681,12 @@ def quantize_midi_tracks(
 
         quantized_events = []
         for qn in quantized_notes:
+            if qn.get('lyric'):
+                l_info = qn['lyric']
+                txt = l_info['text'] if isinstance(l_info, dict) else str(l_info)
+                if isinstance(l_info, dict) and l_info.get('syllabic') in ('begin', 'middle'):
+                    txt = txt + "-"
+                quantized_events.append((qn['start'], mido.MetaMessage('lyrics', text=txt, time=0)))
             quantized_events.append((qn['start'], qn['on_msg']))
             quantized_events.append((qn['end'], qn['off_msg']))
 
@@ -663,10 +735,15 @@ def postprocess_midi(
     trim_leading_bars: bool = False,
     beat_scale: float = 1.0,
     single_voice: bool = True,
-    separate_channels: bool = True
+    separate_channels: bool = True,
+    restricted_triplets: bool = False,
+    lyrics: str | Path | list | None = None
 ) -> tuple[mido.MidiFile, bytes, dict]:
     """Execute complete musical timing, key signature, tempo, quantization, and single-voice postprocessing.
     
+    lyrics: Optional text or parsed lyrics list to align directly onto notes of the vocal track.
+    restricted_triplets=True: Straight binary grid remains primary/priority, allowing triplets
+                              only when notes naturally fit them, without forcing the whole track.
     single_voice=True (Default): Guarantees clean 1-voice notation (Voice 1 in MuseScore) with NO overlaps.
     separate_channels=True (Default): Splits multi-channel tracks so each instrument gets its own staff.
     """
@@ -707,7 +784,9 @@ def postprocess_midi(
             beats_per_bar=eff_ts_num,
             time_sig_denom=eff_ts_denom,
             single_voice=single_voice,
-            separate_channels=separate_channels
+            separate_channels=separate_channels,
+            restricted_triplets=restricted_triplets,
+            lyrics=lyrics
         )
 
     # Inject MetaMessages into Track 0
@@ -761,7 +840,8 @@ def postprocess_midi(
         "key_signature": final_key or "Unspecified",
         "quantized": quantize,
         "grid_div": grid_div,
-        "no_tuplets": (grid_div in (1, 2, 4, 8, 16)),
+        "restricted_triplets": restricted_triplets,
+        "no_tuplets": (not restricted_triplets and (grid_div in (1, 2, 4, 8, 16))),
         "single_voice": single_voice,
         "separate_channels": separate_channels
     }

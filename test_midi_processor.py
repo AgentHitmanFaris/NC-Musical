@@ -299,11 +299,76 @@ def test_guitar_clean_and_distortion_separation():
     print("✓ Guitar & Bass separation test passed: Distortion, Clean, and Bass isolated onto distinct staves")
 
 
+def test_restricted_triplets_quantization():
+    """Verify restricted triplets: binary grid is priority, genuine triplets captured without forcing binary notes."""
+    mid = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mid.tracks.append(tr)
+
+    # Note 1: Straight 16th note at tick 120 (dur: 120)
+    # Note 2: Jittered straight note at tick 248 (near straight 8th at 240, dur: 110)
+    # Note 3: Genuine triplet note at tick 640 (480 + 160: 8th triplet on beat 2, dur: 160)
+    tr.append(mido.Message('note_on', note=60, velocity=80, time=120))
+    tr.append(mido.Message('note_off', note=60, velocity=0, time=120))
+    tr.append(mido.Message('note_on', note=62, velocity=80, time=8)) # absolute 248
+    tr.append(mido.Message('note_off', note=62, velocity=0, time=110)) # absolute 358
+    tr.append(mido.Message('note_on', note=64, velocity=80, time=282)) # absolute 640
+    tr.append(mido.Message('note_off', note=64, velocity=0, time=160)) # absolute 800
+
+    # Pass 1: With restricted_triplets=True
+    processed_rt, _, meta_rt = midi_processor.postprocess_midi(
+        mid,
+        quantize=True,
+        grid_div=4,
+        restricted_triplets=True,
+        single_voice=False,
+        separate_channels=False
+    )
+
+    onsets_rt = []
+    curr = 0
+    for msg in processed_rt.tracks[0]:
+        curr += msg.time
+        if msg.type == 'note_on' and msg.velocity > 0:
+            onsets_rt.append(curr)
+
+    assert onsets_rt[0] == 120, f"Straight 16th note expected at 120, got {onsets_rt[0]}"
+    assert onsets_rt[1] == 240, f"Jittered 248 note expected at binary priority 240, got {onsets_rt[1]}"
+    assert onsets_rt[2] == 640, f"Genuine triplet note at 640 expected at triplet 640, got {onsets_rt[2]}"
+    assert meta_rt['restricted_triplets'] is True
+
+    # Pass 2: With restricted_triplets=False (straight binary only)
+    processed_no_rt, _, meta_no_rt = midi_processor.postprocess_midi(
+        mid,
+        quantize=True,
+        grid_div=4,
+        restricted_triplets=False,
+        single_voice=False,
+        separate_channels=False
+    )
+
+    onsets_no_rt = []
+    curr = 0
+    for msg in processed_no_rt.tracks[0]:
+        curr += msg.time
+        if msg.type == 'note_on' and msg.velocity > 0:
+            onsets_no_rt.append(curr)
+
+    assert onsets_no_rt[0] == 120
+    assert onsets_no_rt[1] == 240
+    # Tick 640 in straight 120-tick grid: 640 / 120 = 5.333 -> snaps to 600
+    assert onsets_no_rt[2] % 120 == 0, f"Expected straight binary grid multiple, got {onsets_no_rt[2]}"
+    assert onsets_no_rt[2] == 600
+
+    print("✓ Restricted triplets quantization test passed: Binary priority preserved and genuine triplets snapped")
+
+
 if __name__ == "__main__":
     test_key_signature_detection()
     test_time_signature_and_tempo_embedding()
     test_time_signature_auto_detection()
     test_quantization_no_tuplets()
+    test_restricted_triplets_quantization()
     test_single_voice_monophonic_resolution()
     test_channel_separation_to_tracks()
     test_piano_grand_staff_and_polyphony()

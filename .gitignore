@@ -20,3 +20,5 @@ cookies.txt
 .agents/
 GEMINI.md
 prompt.txt
+backupmigration/
+firestore_migration_bundle.json
